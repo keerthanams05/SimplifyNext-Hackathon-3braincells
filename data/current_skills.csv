@@ -1,0 +1,31 @@
+user_id,role,skill,proficiency
+USER001,Software Engineer,Python,Advanced
+USER001,Software Engineer,Java,Intermediate
+USER001,Software Engineer,SQL,Intermediate
+USER001,Software Engineer,Git,Advanced
+USER001,Software Engineer,REST APIs,Advanced
+USER001,Software Engineer,Backend Development,Intermediate
+USER001,Software Engineer,Unit Testing,Intermediate
+USER001,Software Engineer,Problem Solving,Advanced
+USER001,Software Engineer,Team Collaboration,Advanced
+USER001,Software Engineer,Communication,Intermediate
+USER002,Digital Marketing Executive,Social Media Marketing,Advanced
+USER002,Digital Marketing Executive,Content Creation,Advanced
+USER002,Digital Marketing Executive,Copywriting,Advanced
+USER002,Digital Marketing Executive,Google Analytics,Intermediate
+USER002,Digital Marketing Executive,Campaign Management,Advanced
+USER002,Digital Marketing Executive,SEO Fundamentals,Intermediate
+USER002,Digital Marketing Executive,Marketing Analytics,Intermediate
+USER002,Digital Marketing Executive,Creativity,Advanced
+USER002,Digital Marketing Executive,Communication,Advanced
+USER002,Digital Marketing Executive,Stakeholder Management,Advanced
+USER003,Accounts Executive,Bookkeeping,Advanced
+USER003,Accounts Executive,Accounts Payable,Advanced
+USER003,Accounts Executive,Accounts Receivable,Advanced
+USER003,Accounts Executive,Bank Reconciliation,Advanced
+USER003,Accounts Executive,Microsoft Excel,Advanced
+USER003,Accounts Executive,Financial Reporting,Intermediate
+USER003,Accounts Executive,Accounting Software,Advanced
+USER003,Accounts Executive,Attention to Detail,Advanced
+USER003,Accounts Executive,Problem Solving,Advanced
+USER003,Accounts Executive,Stakeholder Management,Intermediate

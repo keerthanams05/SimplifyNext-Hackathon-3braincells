@@ -1,0 +1,8 @@
+progress_id,user_id,task,status,completion_pct
+PROG001,USER001,Complete AI fundamentals,Completed,100
+PROG002,USER001,Build LLM prototype,In Progress,50
+PROG003,USER001,Deploy project,Not Started,0
+PROG004,USER002,AI content evaluation exercise,Completed,100
+PROG005,USER002,Marketing analytics dashboard,In Progress,40
+PROG006,USER003,Automation workflow map,Completed,100
+PROG007,USER003,Finance analytics dashboard,Behind Schedule,20

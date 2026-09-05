@@ -1,0 +1,22 @@
+user_id,role,task_id,task,skill_area,baseline_impact,impact_reason
+USER001,Software Engineer,TASK001,Write application code,Python/Java/Software Development,High,"AI coding agents can generate routine and multi-file code, changing the amount of manual coding required."
+USER001,Software Engineer,TASK002,Write unit tests,Software Testing,High,"AI tools can generate test cases and test scaffolding, reducing repetitive manual work."
+USER001,Software Engineer,TASK003,Debug routine defects,Debugging,Medium,"AI assistants can diagnose common errors, but complex root-cause analysis still needs human judgement."
+USER001,Software Engineer,TASK004,Build and maintain APIs,Application Development,Medium,"AI can accelerate implementation, but architecture, requirements and production judgement remain important."
+USER001,Software Engineer,TASK005,Review pull requests,Code Review,Medium,"AI can assist first-pass review and code suggestions, increasing the value of higher-level review judgement."
+USER001,Software Engineer,TASK006,Maintain system architecture,Software Design,Low,"Architecture requires trade-offs, context and accountability that are harder to automate fully."
+USER001,Software Engineer,TASK007,Collaborate with product teams,Stakeholder Management,Low,"Human communication, prioritisation and negotiation remain important."
+USER002,Digital Marketing Executive,TASK011,Write social media copy,Content Marketing,High,Generative AI can rapidly produce first drafts and variants at scale.
+USER002,Digital Marketing Executive,TASK012,Create basic campaign content,Content Marketing Strategy,High,GenAI is increasingly used for ideation and content production.
+USER002,Digital Marketing Executive,TASK013,Prepare routine campaign reports,Market Intelligence / Analytics,Medium,"AI can automate summarisation and reporting, shifting value to interpretation."
+USER002,Digital Marketing Executive,TASK014,Conduct competitor research,Market Research,Medium,"AI can speed research and synthesis, but evidence quality and strategic interpretation still matter."
+USER002,Digital Marketing Executive,TASK015,Coordinate campaign agencies,Contract / Vendor Management,Low,Coordination and stakeholder management remain relatively human-centred.
+USER002,Digital Marketing Executive,TASK016,Develop campaign strategy,Marketing Strategy,Low,"Strategy requires business context, judgement, differentiation and accountability."
+USER002,Digital Marketing Executive,TASK017,Analyse customer behaviour,Customer Behaviour Analysis,Medium,"AI improves pattern discovery and segmentation, increasing the need for analytical fluency."
+USER003,Accounts Executive,TASK021,Process invoices,Finance Operations,High,"AI-enabled invoice workflows can extract, validate and route high-volume transactions."
+USER003,Accounts Executive,TASK022,Perform data entry,Finance Operations,High,Structured transactional input is highly automatable.
+USER003,Accounts Executive,TASK023,Perform bank reconciliation,Account Reconciliation,High,Automation and AI agents can compare records and flag exceptions.
+USER003,Accounts Executive,TASK024,Manage accounts payable / receivable,AR/AP Management,Medium,Routine matching and workflow steps can increasingly be automated.
+USER003,Accounts Executive,TASK025,Prepare routine financial reports,Financial Reporting,Medium,"AI can automate collection, consolidation and narrative drafting, while humans validate outputs."
+USER003,Accounts Executive,TASK026,Support month-end close,Financial Close,Medium,Automation can reduce repetitive close activities and reconciliation work.
+USER003,Accounts Executive,TASK027,Interpret unusual transactions / exceptions,Financial Analysis / Controls,Low,Human judgement and contextual investigation remain important.

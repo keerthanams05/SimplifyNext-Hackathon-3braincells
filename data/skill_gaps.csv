@@ -1,0 +1,19 @@
+user_id,role,gap_id,skill,gap_priority,why_it_matters
+USER001,Software Engineer,SKG001,AI-Assisted Software Development,High,"AI coding workflow, agent supervision and review"
+USER001,Software Engineer,SKG002,LLM Application Development,High,Build applications that consume and orchestrate LLMs
+USER001,Software Engineer,SKG003,Prompt / Context Engineering,Medium,Design reliable instructions and context for AI tools
+USER001,Software Engineer,SKG004,Cloud Deployment,Medium,Deploy and operate AI-enabled services
+USER001,Software Engineer,SKG005,AI System Integration,High,Integrate AI agents/models into production workflows
+USER001,Software Engineer,SKG006,MLOps / AI Evaluation Fundamentals,Medium,"Evaluate reliability, cost and performance"
+USER002,Digital Marketing Executive,SKG011,Generative AI for Marketing,High,"Use AI tools across ideation, content and optimisation workflows"
+USER002,Digital Marketing Executive,SKG012,AI Content Evaluation,High,"Evaluate quality, brand fit, factuality and originality of AI-generated content"
+USER002,Digital Marketing Executive,SKG013,Advanced Marketing Analytics,High,Turn campaign data into decisions
+USER002,Digital Marketing Executive,SKG014,Customer Segmentation,Medium,Use data to define and target audience segments
+USER002,Digital Marketing Executive,SKG015,Data Storytelling,Medium,Communicate insights to stakeholders
+USER002,Digital Marketing Executive,SKG016,AI-Assisted Campaign Strategy,Medium,Combine human strategy with AI-supported execution
+USER003,Accounts Executive,SKG021,Accounting Automation,High,"Understand automated AP/AR, reconciliation and workflow tools"
+USER003,Accounts Executive,SKG022,Financial Data Analytics,High,Analyse financial data beyond transaction processing
+USER003,Accounts Executive,SKG023,Power BI / Data Visualisation,Medium,Build decision-support dashboards
+USER003,Accounts Executive,SKG024,Process Automation,Medium,Identify and redesign repeatable finance workflows
+USER003,Accounts Executive,SKG025,AI-Assisted Finance,Medium,"Use AI safely for analysis, reporting and exception handling"
+USER003,Accounts Executive,SKG026,Business Partnering,Medium,Translate finance insights into business decisions

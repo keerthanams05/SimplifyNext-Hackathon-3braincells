@@ -1,0 +1,7 @@
+user_id,target_role,similarity_score,transferable_skills,gap_to_role,reason
+USER001,AI Application Engineer,82,"Python, APIs, backend development, problem solving","LLM application development, AI evaluation, deployment",Strong overlap with software engineering plus emerging AI integration skills.
+USER001,Cloud Engineer,75,"Backend development, APIs, Git, software troubleshooting","Cloud architecture, infrastructure automation, observability",Existing engineering foundation transfers well into cloud-focused work.
+USER002,Marketing Analyst,85,"Campaign management, analytics, customer behaviour, marketing domain","Advanced analytics, data visualisation, SQL/statistical fluency",Strong marketing knowledge can be combined with deeper analytics.
+USER002,Growth Analyst,72,"Campaigns, SEO, marketing analytics, customer understanding","Experimentation, funnel analytics, product/growth metrics",Marketing experience provides a useful base for data-driven growth work.
+USER003,Financial Analyst,88,"Accounting, financial reporting, Excel, attention to detail","Analytics, forecasting, visualisation, business insights",Accounting knowledge is highly transferable to analytical finance.
+USER003,Business Analyst,70,"Process knowledge, finance domain, problem solving, stakeholder management","Requirements analysis, data analytics, process modelling",Finance process knowledge can transfer into broader business analysis.
