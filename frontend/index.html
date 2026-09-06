@@ -334,8 +334,10 @@ function renderDetail(data) {
   el.innerHTML = html;
 }
 
-document.getElementById("goToDashboardBtn").addEventListener("click", loadDashboard);
-document.getElementById("goToDashboardBtn").addEventListener("click", () => showScreen("screen-dashboard"));
+document.getElementById("goToDashboardBtn").addEventListener("click", () => {
+  showScreen("screen-dashboard");
+  loadDashboard();
+});
 
 loadAccounts();
 </script>

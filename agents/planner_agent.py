@@ -200,7 +200,11 @@ def save_plan(result: dict):
     scripts/create_table.py before relying on this)."""
     table = dynamodb.Table(table_name("generated_plans"))
     plan_id = f"PLAN-{result['user_id']}-{result['signal_id']}"
-    table.put_item(Item={"plan_id": plan_id, **result})
+    # DynamoDB rejects Python floats, and the model can return one anywhere
+    # in the plan (e.g. hours_per_week: 5.5), so round-trip through JSON
+    # with parse_float=Decimal — same trick as signal_agent.save_result.
+    item = json.loads(json.dumps({"plan_id": plan_id, **result}), parse_float=Decimal)
+    table.put_item(Item=item)
     print(f"  Saved plan {plan_id} to DynamoDB.")
 
 
