@@ -298,6 +298,44 @@ def validate_resource_ids(result: dict, valid_resource_ids: set[str]):
         )
 
 
+def split_points(text: str) -> list[str]:
+    """The model returns milestones and tasks as one semicolon-separated
+    string, matching the shape of plans_30_60_90.csv. That renders as a wall
+    of text, so split it into the steps it already is."""
+    if not isinstance(text, str):
+        return []
+    return [part.strip() for part in text.split(";") if part.strip()]
+
+
+def enrich_phases(result: dict, resources: list[dict]) -> dict:
+    """
+    Turn each phase's bare resource_ids into the real records, and its
+    semicolon strings into lists — same convention as the other agents:
+    hand the frontend something self-contained rather than IDs it has to
+    cross-reference and prose it has to parse.
+
+    `resource_ids` is kept as-is so nothing downstream that already reads
+    it breaks.
+    """
+    lookup = {r["resource_id"]: r for r in resources}
+    for phase in result.get("phases", []):
+        phase["task_steps"] = split_points(phase.get("tasks"))
+        phase["milestone_steps"] = split_points(phase.get("milestones"))
+        phase["resources"] = [
+            {
+                "resource_id": rid,
+                "name": lookup[rid].get("name"),
+                "provider": lookup[rid].get("provider"),
+                "type": lookup[rid].get("type"),
+                "funding": lookup[rid].get("funding"),
+                "url": lookup[rid].get("url"),
+            }
+            for rid in phase.get("resource_ids", [])
+            if rid in lookup
+        ]
+    return result
+
+
 def save_plan(result: dict):
     """Persist a generated plan to the generated_plans table.
 
@@ -386,6 +424,7 @@ def run_planner_agent(
 
     validate_plan_shape(result)
     validate_resource_ids(result, valid_resource_ids)
+    result = enrich_phases(result, resources)
 
     if verbose:
         print(f"\nPlanner verdict for {user_id} / {signal_id} (model: {model_id}):")
