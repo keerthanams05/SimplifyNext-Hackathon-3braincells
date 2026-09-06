@@ -164,6 +164,14 @@
   .res-name { font-size: 12px; font-weight: 700; }
   .res-meta { font-size: 10.5px; color: var(--muted); }
 
+  .map-stage { background: linear-gradient(#F7FAF6, #EEF4EC); }
+  .map-stage svg { width: 100%; height: 260px; display: block; }
+  .house { transition: transform 0.15s; transform-box: fill-box; transform-origin: center; }
+  .house:hover { filter: brightness(1.04); }
+  .house-on { filter: drop-shadow(0 3px 6px rgba(44,49,64,0.28)); }
+  .map-caption { padding: 13px 15px 15px; border-top: 1.5px solid var(--line); background: #FFF; }
+  button.chip { font-family: var(--ui); }
+
   .footnote { text-align: center; font-size: 11.5px; color: var(--muted); padding: 6px 0 2px; }
   .linkish { background: none; border: none; font-family: var(--ui); font-size: 11.5px;
              font-weight: 700; color: var(--peri-ink); cursor: pointer; text-decoration: underline;
@@ -297,6 +305,10 @@
 
     <!-- ROLES -->
     <section class="screen" id="s-roles">
+      <div class="block plain" style="padding:0;overflow:hidden">
+        <div id="mapStage" class="map-stage"><div class="skeleton" style="margin:20px"></div></div>
+        <div id="mapCaption" class="map-caption"></div>
+      </div>
       <p class="small">Star anything you're curious about. We watch the news for it every morning, even if you never do anything else about it.</p>
       <div class="stack" id="rolesList"><div class="skeleton"></div></div>
       <div class="block plain">
@@ -490,6 +502,116 @@ async function loadHome() {
   }).catch(e => { $("homeProgress").innerHTML = errorBlock("Progress", e); });
 }
 
+// ---------- the career map ----------
+// Six slots, each checked against the island's diamond edge so a house can
+// never hang off it: |x-400|/230 + |y-300|/115 <= 1 for every ground corner.
+// Front slot is where you are now; the rest are places you could go.
+const MAP_SLOTS = [
+  [400, 330, 1.10],  // current
+  [505, 285, 0.95], [300, 268, 0.85], [390, 232, 0.78], [470, 328, 0.72], [284, 312, 0.72],
+];
+const HOUSE_PALETTE = [
+  { wallL: "#FDF6E7", wallR: "#F8E4BC", roofL: "#F2D296", roofR: "#E8C077", door: "#D0A455", line: "#D9B36A" },
+  { wallL: "#E7F4EE", wallR: "#CFE8DA", roofL: "#B4DBC6", roofR: "#9BCDB3", door: "#77B695", line: "#86BCA3" },
+  { wallL: "#EDEFFA", wallR: "#D9DEF5", roofL: "#C3CBEF", roofR: "#AEB8E8", door: "#8E9AD6", line: "#9AA5DE" },
+  { wallL: "#FDF0F1", wallR: "#F6D9DC", roofL: "#EFC4C9", roofR: "#E3AEB5", door: "#D79AA2", line: "#D79AA2" },
+  { wallL: "#F5F2FB", wallR: "#E9E4F3", roofL: "#DAD2EC", roofR: "#C7BBE2", door: "#B3A5D6", line: "#B3A5D6" },
+  { wallL: "#EFF6FA", wallR: "#D2E5F0", roofL: "#BBD8E8", roofR: "#A3C8DE", door: "#8CB8D2", line: "#8CB8D2" },
+];
+
+function house(cx, cy, scale, c, isCurrent, index) {
+  return `<g transform="translate(${cx},${cy}) scale(${scale})" stroke="${c.line}"
+             stroke-width="${(2 / scale).toFixed(2)}" stroke-linejoin="round"
+             class="house" data-house="${index}" style="cursor:pointer">
+    <polygon points="-30,0 0,15 0,51 -30,36" fill="${c.wallL}"/>
+    <polygon points="0,15 30,0 30,36 0,51" fill="${c.wallR}"/>
+    <polygon points="-30,0 0,15 0,-45" fill="${c.roofL}"/>
+    <polygon points="0,15 30,0 0,-45" fill="${c.roofR}"/>
+    <polygon points="7.5,19.25 16.5,14.75 16.5,32.75 7.5,37.25" fill="${c.door}"/>
+    ${isCurrent ? `<polygon points="-21,14.5 -12,19 -12,27 -21,22.5" fill="#FFFDF7"/>` : ""}
+  </g>`;
+}
+
+function renderMap(d) {
+  const stops = [d.current, ...(d.destinations || [])].slice(0, MAP_SLOTS.length);
+  state.mapStops = stops;
+
+  let svg = `<svg viewBox="150 150 500 340" role="img"
+      aria-label="Your career map: ${esc(d.current.target_role)} today, with ${stops.length - 1} saved roles you could move into.">
+    <polygon points="170,300 400,185 630,300 400,415" fill="#DCEAD9" stroke="#94B78E" stroke-width="2"/>
+    <polygon points="170,300 400,415 400,448 170,333" fill="#C7DBC4" stroke="#94B78E" stroke-width="2"/>
+    <polygon points="630,300 400,415 400,448 630,333" fill="#B9D0B6" stroke="#94B78E" stroke-width="2"/>`;
+
+  // dotted route from where you are to each place you could go
+  const [hx, hy] = MAP_SLOTS[0];
+  stops.slice(1).forEach((_, i) => {
+    const [tx, ty] = MAP_SLOTS[i + 1];
+    svg += `<path d="M ${hx} ${hy + 22} Q ${(hx + tx) / 2} ${(hy + ty) / 2 + 30} ${tx} ${ty + 26}"
+      fill="none" stroke="#8FA98A" stroke-width="4" stroke-linecap="round" stroke-dasharray="1 12"/>`;
+  });
+
+  // draw back-to-front so nearer houses overlap correctly
+  stops.map((stop, i) => ({ stop, i }))
+       .sort((a, b) => MAP_SLOTS[a.i][1] - MAP_SLOTS[b.i][1])
+       .forEach(({ stop, i }) => {
+         const [cx, cy, sc] = MAP_SLOTS[i];
+         svg += house(cx, cy, sc, HOUSE_PALETTE[i % HOUSE_PALETTE.length], i === 0, i);
+         const label = i === 0 ? "You are here" : `${stop.similarity_score ?? "?"}% fit`;
+         svg += `<text x="${cx}" y="${cy + sc * 51 + 17}" text-anchor="middle"
+            font-family="Karla, sans-serif" font-size="13" font-weight="700"
+            fill="#2C3140" pointer-events="none">${esc(label)}</text>`;
+       });
+
+  svg += `</svg>`;
+  $("mapStage").innerHTML = svg;
+
+  document.querySelectorAll("[data-house]").forEach(el =>
+    el.addEventListener("click", () => selectStop(Number(el.dataset.house))));
+  selectStop(0);
+}
+
+function selectStop(i) {
+  const stop = (state.mapStops || [])[i];
+  if (!stop) return;
+  document.querySelectorAll("[data-house]").forEach(el =>
+    el.classList.toggle("house-on", Number(el.dataset.house) === i));
+
+  const isCurrent = stop.status === "current";
+  $("mapCaption").innerHTML = `
+    <div class="row between" style="margin-bottom:5px">
+      <span class="b-title">${esc(stop.target_role)}</span>
+      <span class="tag">${isCurrent ? "Where you are" : (stop.similarity_score ?? "?") + "% fit"}</span>
+    </div>
+    <div class="small">${esc(stop.reason || stop.note || "")}</div>
+    ${stop.gap_to_role ? `<div class="small" style="margin-top:6px"><b>Still missing:</b> ${esc(stop.gap_to_role)}</div>` : ""}
+    ${!isCurrent ? `<button class="cta ghost" style="margin-top:10px" data-goto-opps="${esc(stop.target_role)}">
+        Where to go for this →</button>` : ""}`;
+
+  const btn = document.querySelector("[data-goto-opps]");
+  if (btn) btn.addEventListener("click", () => openPathway(btn.dataset.gotoOpps));
+}
+
+// Jumping straight from a role to its opportunities — used by the map and
+// by the home-screen chips, which previously looked tappable and weren't.
+function openPathway(role) {
+  state.oppRole = role;
+  show("s-opps", { push: false });
+  document.querySelectorAll("#nav button").forEach(b => b.classList.toggle("on", b.dataset.go === "s-opps"));
+  buildOppTabs();
+  document.querySelectorAll("#oppTabs button").forEach(b =>
+    b.classList.toggle("on", b.dataset.role === role));
+  loadOpportunities(role);
+}
+
+async function loadMap() {
+  try {
+    const d = await api(`/api/map?user_id=${state.userId}`);
+    renderMap(d);
+  } catch (e) {
+    $("mapStage").innerHTML = errorBlock("Your map", e);
+  }
+}
+
 // ---------- roles ----------
 const STATUS_STYLE = {
   current: ["butter", "Now", "var(--butter-ink)"],
@@ -504,9 +626,13 @@ async function loadRoles() {
     $("homeRoleCount").textContent = n === 1 ? "1 role" : `${n} roles`;
     // Role names, not agent initials. This block used to render the agent
     // badges under a "roles" count, which meant nothing to anyone.
+    // These are buttons, not decoration — tapping one opens that pathway.
     $("homeRoles").innerHTML = state.savedRoles.map(r =>
-      `<span class="chip ${r.status === "current" ? "on" : ""}">${esc(r.target_role)}</span>`).join("")
+      `<button class="chip ${r.status === "current" ? "on" : ""}" data-open-role="${esc(r.target_role)}">
+        ${esc(r.target_role)}</button>`).join("")
       || `<span class="small">Nothing saved yet — star a role to start watching it.</span>`;
+    document.querySelectorAll("[data-open-role]").forEach(btn =>
+      btn.addEventListener("click", () => openPathway(btn.dataset.openRole)));
     $("rolesList").innerHTML = state.savedRoles.map(r => {
       const [cls, label, ink] = STATUS_STYLE[r.status] || STATUS_STYLE.watching;
       return `<div class="block ${cls}">
@@ -924,7 +1050,7 @@ document.querySelectorAll("#nav button").forEach(b =>
     if (id === "s-alerts") loadAlerts();
     if (id === "s-opps") loadOpportunities(state.oppRole);
     if (id === "s-prep") loadPrep();
-    if (id === "s-roles") loadRoles();
+    if (id === "s-roles") { loadRoles(); loadMap(); }
   }));
 
 $("sheetClose").addEventListener("click", () => { $("sheet").hidden = true; });

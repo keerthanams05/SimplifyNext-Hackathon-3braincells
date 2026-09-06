@@ -541,3 +541,55 @@ def run_watch(source: str = "feeds", dry_run: bool = True, model: str = "nova"):
         return run_market_watcher(source_mode=source, model_key=model, dry_run=dry_run)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Market watcher error: {e}")
+
+
+@app.get("/api/map")
+def get_map(user_id: str):
+    """The career map: where this person is now, and the roles they've
+    saved, each with how much of their experience carries over.
+
+    Joins saved_roles with pathfinder_results here rather than in the
+    frontend — the fit score lives in one table and the star in another,
+    and cross-referencing two lists in the browser is how they drift.
+    """
+    users_table = dynamodb.Table(table_name("users"))
+    persona = users_table.get_item(Key={"user_id": user_id}).get("Item")
+    if not persona:
+        raise HTTPException(status_code=404, detail=f"No persona found: {user_id}")
+
+    saved = dynamodb.Table(table_name("saved_roles")).query(
+        KeyConditionExpression=Key("user_id").eq(user_id)).get("Items", [])
+    fits = {f["target_role"]: f for f in dynamodb.Table(table_name("pathfinder_results")).query(
+        KeyConditionExpression=Key("user_id").eq(user_id)).get("Items", [])}
+
+    current, destinations = None, []
+    for role in saved:
+        name = role.get("target_role")
+        fit = fits.get(name, {})
+        entry = {
+            "target_role": name,
+            "status": role.get("status"),
+            "note": role.get("note"),
+            "similarity_score": fit.get("similarity_score"),
+            "transferable_skills": fit.get("transferable_skills"),
+            "gap_to_role": fit.get("gap_to_role"),
+            "reason": fit.get("reason"),
+        }
+        if role.get("status") == "current":
+            current = entry
+        else:
+            destinations.append(entry)
+
+    # Closest fit first — that's the one worth looking at.
+    destinations.sort(key=lambda d: -(d["similarity_score"] or 0))
+
+    if current is None:
+        current = {"target_role": persona.get("occupation"), "status": "current",
+                   "note": "Where you are today", "similarity_score": None}
+
+    return decimal_to_native({
+        "user_id": user_id,
+        "name": persona.get("name"),
+        "current": current,
+        "destinations": destinations[:5],   # the map has five destination slots
+    })
