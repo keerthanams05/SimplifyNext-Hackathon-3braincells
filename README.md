@@ -1,140 +1,824 @@
-# SimplifyNext-Hackathon-3braincells
+# CareerGuardian
 
-An agentic AI pipeline that monitors career-disruption signals (e.g. AI/automation
-adoption trends), works out which parts of a specific person's role are actually
-affected, and produces a personalised 30/60/90-day upskilling plan — grounded in
-real SkillsFuture / WSG Singapore resources.
+### AI-powered career resilience for a changing workforce
 
-Built for the SimplifyNext Agentic AI Hackathon 2026, using AWS Bedrock
-(Claude + Nova) and DynamoDB.
+CareerGuardian is an agentic AI system that helps workers understand how real-world technology and labour-market disruptions affect **their specific role**, what skills they should build next, which adjacent career paths may become more attractive, and when their learning plan needs to be updated.
 
-## Architecture
+Built for the **SimplifyNext Agentic AI Hackathon 2026**.
 
+---
+
+## Overview
+
+Most career tools stop at generic advice:
+
+> "AI is changing software engineering. Learn AI."
+
+CareerGuardian goes further.
+
+It connects a real-world disruption signal to a person's actual:
+
+* role
+* tasks
+* current skills
+* skill gaps
+* learning resources
+* career options
+* progress
+
+This creates an adaptive career-planning loop:
+
+```text
+Disruption Signal
+       ↓
+Signal Agent
+       ↓
+Role Intelligence
+       ↓
+Personalised 30/60/90 Plan
+       ↓
+Adjacent Career Paths
+       ↓
+Progress Monitoring
+       ↓
+Re-planning when necessary
 ```
-Signal  ──▶  Signal Agent  ──▶  Role Intelligence Agent  ──▶  Planner Agent
-(raw)        (validate &          (which of THIS person's        (30/60/90-day
-              score it)            tasks/gaps does it hit)        plan, grounded
-                                                                   in real resources)
+
+---
+
+## Key Features
+
+### Personalised disruption analysis
+
+CareerGuardian does not assume that every disruption affects everyone equally.
+
+The system determines which parts of a specific person's role are affected by a signal.
+
+### AI-generated 30/60/90-day plans
+
+The Planner Agent converts identified skill gaps into an actionable:
+
+* Days 1–30 plan
+* Days 31–60 plan
+* Days 61–90 plan
+
+Each phase includes goals, milestones, tasks, relevant learning resources, and expected weekly effort.
+
+### Grounded learning resources
+
+Planner recommendations are restricted to resources that actually exist in the application's resource catalogue.
+
+Unknown or hallucinated resource IDs are rejected.
+
+### Adjacent career navigation
+
+The Pathfinder Agent ranks precomputed adjacent career options according to the current disruption.
+
+### Progress-aware replanning
+
+The Progress Agent checks whether someone is falling behind and determines whether their plan should be regenerated.
+
+### End-to-end browser demo
+
+A lightweight frontend demonstrates the complete workflow through a FastAPI backend connected to AWS services.
+
+---
+
+# Architecture
+
+```text
+                          ┌────────────────────┐
+                          │   Disruption Data  │
+                          └─────────┬──────────┘
+                                    │
+                                    ▼
+                          ┌────────────────────┐
+                          │    Signal Agent    │
+                          │                    │
+                          │ Validate signal   │
+                          │ Score relevance    │
+                          │ Assess severity    │
+                          └─────────┬──────────┘
+                                    │
+                                    ▼
+                          ┌────────────────────┐
+                          │ Role Intelligence  │
+                          │      Agent         │
+                          │                    │
+                          │ Signal + person    │
+                          │ + tasks + skills   │
+                          │ + skill gaps       │
+                          └─────────┬──────────┘
+                                    │
+                                    ▼
+                          ┌────────────────────┐
+                          │   Planner Agent    │
+                          │                    │
+                          │ Personalised       │
+                          │ 30 / 60 / 90 plan  │
+                          └─────────┬──────────┘
+                                    │
+                                    ▼
+                          ┌────────────────────┐
+                          │ Pathfinder Agent   │
+                          │                    │
+                          │ Rank adjacent      │
+                          │ career options     │
+                          └────────────────────┘
+
+
+                    ┌──────────────────────────┐
+                    │     Progress Agent       │
+                    │                          │
+                    │ Is the person behind?    │
+                    │ Does the plan need       │
+                    │ to be regenerated?       │
+                    └────────────┬─────────────┘
+                                 │
+                          needs_replan?
+                            /         \
+                          No           Yes
+                          │             │
+                          ▼             ▼
+                       Continue      Planner
 ```
 
-Each stage is a standalone CLI script under `agents/`, backed by DynamoDB tables
-(seeded from `data/*.csv` via `scripts/load_data.py`) and calling Bedrock via
-`scripts/config.py`'s model IDs.
+---
 
-**Two guardrails baked into every agent's prompt**, learned from testing:
-1. Each system prompt states today's real date and explicitly tells the model
-   not to reject unfamiliar signals/dates as fabrication just because they're
-   after its training cutoff.
-2. Each agent that returns IDs (`task_id`, `gap_id`, `resource_id`) is told to
-   ONLY use IDs from an explicit allow-list passed in the prompt, and a
-   `validate_*` function checks the model's output against that list afterward
-   and prints a `WARNING` if it invented one. **Always check for that warning
-   before trusting an agent's output** — it means the model hallucinated an ID
-   that doesn't exist in your data.
+# Agent Architecture
 
-## Agents
+## 1. Signal Agent
 
-### 1. Signal Agent (`agents/signal_agent.py`)
-Takes a `signal_id`, validates it against evidence quality/sourcing, and scores
-relevance (0-100) and severity (Low/Medium/High).
+**File:** `agents/signal_agent.py`
+
+The Signal Agent evaluates a disruption signal using its supplied evidence.
+
+It produces:
+
+* validation result
+* relevance score
+* severity
+* explanation
+
+Example:
+
+```json
+{
+  "signal_id": "SIG001",
+  "validated": true,
+  "relevance_score": 96,
+  "severity": "High",
+  "reason": "..."
+}
+```
+
+Run it directly:
 
 ```bash
 python agents/signal_agent.py SIG001
-python agents/signal_agent.py SIG001 --model nova
-python agents/signal_agent.py SIG001 --save   # writes verdict back to DynamoDB
 ```
 
-### 2. Role Intelligence Agent (`agents/role_intelligence_agent.py`)
-Takes `user_id` + `signal_id`. Pulls that person's own `role_tasks` and
-`skill_gaps` from DynamoDB, and asks the model which of *this specific
-person's* tasks/gaps are actually affected by *this specific signal* — not a
-generic "does this signal matter" answer.
+---
+
+## 2. Role Intelligence Agent
+
+**File:** `agents/role_intelligence_agent.py`
+
+This is the main personalisation layer.
+
+It combines:
+
+* the disruption signal
+* the person's role
+* the person's tasks
+* current skills
+* skill gaps
+
+to determine what is actually affected.
+
+Conceptually:
+
+```text
+Signal
+  +
+Person
+  +
+Tasks
+  +
+Current Skills
+  +
+Skill Gaps
+      ↓
+Role Intelligence
+      ↓
+Affected Tasks
+Affected Skills
+Priority Gaps
+Explanation
+```
+
+Run it with:
 
 ```bash
 python agents/role_intelligence_agent.py USER001 SIG001
-python agents/role_intelligence_agent.py USER001 SIG001 --model nova
 ```
 
-Returns empty `affected_tasks`/`affected_skills`/`skill_gaps` when the signal
-genuinely doesn't apply to that person (e.g. a software-engineering signal
-against a marketing or finance persona) — confirmed working for
-USER002/SIG005 and USER003/SIG009.
+---
 
-### 3. Planner Agent (`agents/planner_agent.py`)
-Takes `user_id` + `signal_id`. Reuses the Role Intelligence Agent's verdict for
-that pair, pulls the full `resources` catalogue (SkillsFuture/WSG programmes),
-and asks the model for a 3-phase (Days 1-30 / 31-60 / 61-90) upskilling plan,
-citing only real `resource_id`s.
+## 3. Planner Agent
+
+**File:** `agents/planner_agent.py`
+
+The Planner converts the Role Intelligence verdict into a personalised 30/60/90-day upskilling plan.
+
+Each phase contains:
+
+```text
+goal
+milestones
+tasks
+resource_ids
+hours_per_week
+```
+
+The Planner has several important safeguards:
+
+* exactly three phases are required
+* phase order is enforced
+* required fields are validated
+* resource IDs must exist in the trusted resource catalogue
+* invalid resource IDs are rejected
+* irrelevant signals can short-circuit without another Bedrock call
+* an existing Role Intelligence verdict can be reused rather than recomputed
+
+Run it with:
 
 ```bash
 python agents/planner_agent.py USER001 SIG001
-python agents/planner_agent.py USER001 SIG001 --model nova
-python agents/planner_agent.py USER001 SIG001 --save   # writes to `generated_plans` table (create it first, see below)
 ```
 
-**Short-circuit behaviour:** if the Role Intelligence verdict for a
-user/signal pair is empty (signal doesn't affect them), the Planner does NOT
-call Bedrock to invent a plan — it returns `"phases": []` with a
-`"no_plan_reason"` explaining why. This was added after testing showed the
-model would otherwise fabricate a low-effort plan even for clearly irrelevant
-signals (e.g. a marketing-sector signal against a finance persona).
-
-## Data model
-
-DynamoDB tables (seeded via `scripts/load_data.py` from `data/*.csv`,
-table names resolved through `scripts/config.py`'s `table_name()`):
-
-| Short name    | Partition key | Source CSV              | Notes |
-|---------------|---------------|--------------------------|-------|
-| `signals`     | `signal_id`   | `data/signals.csv`       | Raw disruption signals |
-| `role_tasks`  | `user_id`     | `data/role_tasks.csv`    | Per-person current tasks |
-| `skill_gaps`  | `user_id`     | `data/skill_gaps.csv`    | Per-person skill gaps, prioritised |
-| `resources`   | `resource_id` (assumed) | `data/resources.csv` | Global — SkillsFuture/WSG programmes. No per-user key, so the Planner Agent scans the whole table. |
-| `current_skills` | — | `data/current_skills.csv` | Not yet wired into an agent |
-| `pathfinder`  | — | `data/pathfinder.csv`    | Reference alt-career-path data — not yet wired into an agent |
-| `progress`    | — | `data/progress.csv`      | Not yet wired into an agent |
-| `personas`    | — | `data/personas.csv`      | Persona definitions (Sarah/USER001 = SWE, Daniel/USER002 = Marketing, Michelle/USER003 = Finance) |
-| `plans_30_60_90` | `user_id` | `data/plans_30_60_90.csv` | **Reference/gold-standard plans** for demo sanity-checking — not read by the Planner Agent, which generates its own |
-
-`generated_plans` (partition key `plan_id`, string) does **not exist yet** —
-create it in `scripts/create_table.py` before using `planner_agent.py --save`.
-
-## Setup
+Save the generated plan:
 
 ```bash
-# One-time AWS SSO setup
-aws configure sso   # profile name: hack2026, account 479575346211
-aws sso login --profile hack2026
-export AWS_PROFILE=hack2026
+python agents/planner_agent.py USER001 SIG001 --save
+```
 
-# Python env
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+---
 
-# Seed DynamoDB (once per fresh account/session)
+## 4. Pathfinder Agent
+
+**File:** `agents/pathfinder_agent.py`
+
+The Pathfinder ranks adjacent career options based on the current disruption.
+
+It works from the person's existing candidate career paths rather than inventing arbitrary roles.
+
+Example:
+
+```text
+Candidate roles
+      +
+Current disruption
+      ↓
+Pathfinder
+      ↓
+Ranked adjacent careers
+```
+
+Run it with:
+
+```bash
+python agents/pathfinder_agent.py USER001 SIG001
+```
+
+---
+
+## 5. Progress Agent
+
+**File:** `agents/progress_agent.py`
+
+The Progress Agent determines whether a person is falling behind and whether a new plan is required.
+
+Example output:
+
+```json
+{
+  "behind_items": [
+    "PROG002"
+  ],
+  "needs_replan": true,
+  "explanation": "..."
+}
+```
+
+Run it with:
+
+```bash
+python agents/progress_agent.py USER001
+```
+
+---
+
+# End-to-End Pipeline
+
+**File:** `agents/pipeline.py`
+
+The main pipeline connects the core agents:
+
+```text
+Signal Agent
+     ↓
+Role Intelligence Agent
+     ↓
+Planner Agent
+     ↓
+Pathfinder Agent
+```
+
+The Role Intelligence result is passed directly to Planner to avoid unnecessary duplicate model calls.
+
+Run the full pipeline:
+
+```bash
+python agents/pipeline.py USER001 SIG001
+```
+
+The combined response contains:
+
+```json
+{
+  "user_id": "USER001",
+  "signal_id": "SIG001",
+  "signal": {},
+  "role_intelligence": {},
+  "plan": {},
+  "pathfinder": {}
+}
+```
+
+---
+
+# AWS Architecture
+
+CareerGuardian uses AWS for data storage and model inference.
+
+```text
+CSV Dataset
+     ↓
+     S3
+     ↓
+Data Loader
+     ↓
+DynamoDB
+     ↓
+Agents
+     ↓
+Amazon Bedrock
+     ↓
+FastAPI
+     ↓
+Frontend
+```
+
+### AWS services used
+
+| Service         | Purpose                     |
+| --------------- | --------------------------- |
+| Amazon Bedrock  | Agent model inference       |
+| Amazon DynamoDB | Structured application data |
+| Amazon S3       | CSV/data storage            |
+| FastAPI         | Backend API                 |
+
+---
+
+# Model Strategy
+
+Different agents use different model tiers depending on the complexity of the task.
+
+| Agent              | Model Tier | Reason                       |
+| ------------------ | ---------- | ---------------------------- |
+| Signal Agent       | Claude     | Signal/evidence reasoning    |
+| Role Intelligence  | Claude     | Person-specific reasoning    |
+| Planner            | Claude     | Multi-stage planning         |
+| Pathfinder         | Claude     | Comparative career reasoning |
+| Resource Connector | Nova       | Structured matching concept  |
+| Replanning Trigger | Nova       | Narrow decision concept      |
+| Explainer          | Claude     | User-facing synthesis        |
+
+The final three are currently represented in configuration but are not separate standalone agents in the repository.
+
+---
+
+# Data Model
+
+The project uses CSV files as the source dataset and loads them into DynamoDB.
+
+```text
+data/
+├── personas.csv
+├── current_skills.csv
+├── role_tasks.csv
+├── skill_gaps.csv
+├── signals.csv
+├── resources.csv
+├── plans_30_60_90.csv
+├── pathfinder.csv
+└── progress.csv
+```
+
+### DynamoDB tables
+
+| Table                | Purpose                         |
+| -------------------- | ------------------------------- |
+| `users`              | Persona/profile information     |
+| `user_skills`        | Current skills                  |
+| `role_tasks`         | Person-specific tasks           |
+| `skill_gaps`         | Identified skill gaps           |
+| `signals`            | Disruption signals              |
+| `resources`          | Learning resources              |
+| `plans`              | Plan/reference-plan data        |
+| `progress`           | Progress records                |
+| `pathfinder_results` | Candidate career paths          |
+| `generated_plans`    | Configured generated-plan table |
+
+The schema is centralised in:
+
+```text
+scripts/config.py
+```
+
+---
+
+# Data Loading
+
+Create the DynamoDB tables:
+
+```bash
 python scripts/create_table.py
+```
+
+Load the dataset:
+
+```bash
 python scripts/load_data.py
 ```
 
-Bedrock model IDs and AWS/Bedrock regions live in `scripts/config.py`
-(`CLAUDE_MODEL_ID`, `NOVA_MICRO_MODEL_ID`, `AWS_REGION`, `BEDROCK_REGION`).
+Load a single file:
 
-## Known issues / open items
+```bash
+python scripts/load_data.py --only personas.csv
+```
 
-- **`.env` handling**: make sure no real credentials are committed. Use
-  `.env.example` with variable names only; add `.env` to `.gitignore`.
-- **`--save` paths are untested** for both `signal_agent.py` and
-  `planner_agent.py` in this environment — confirm target tables exist before
-  relying on them in the demo.
-- **`resources` table partition key** — assumed to be `resource_id`; confirm
-  against `scripts/create_table.py`.
-- Not every `user_id` × `signal_id` combination has been run through the full
-  pipeline end-to-end yet.
+The loader:
 
-## Roadmap
+1. reads the source CSV data
+2. parses configured structured fields
+3. converts values into DynamoDB-compatible types
+4. writes records in batches
+5. records load information in `processed/load_summary.json`
 
-- [x] Signal Agent
-- [x] Role Intelligence Agent
-- [x] Planner Agent
-- [ ] Pathfinder Agent (alternate career-path recommendations, using `data/pathfinder.csv` as reference)
-- [ ] Progress Agent (tracks plan completion against `data/progress.csv`, flags drift / re-plans)
+---
+
+# API
+
+**File:** `api/main.py`
+
+Start the API:
+
+```bash
+uvicorn api.main:app --reload --port 8000
+```
+
+### Available endpoints
+
+| Endpoint                                      | Purpose                                 |
+| --------------------------------------------- | --------------------------------------- |
+| `GET /api/personas`                           | List demo personas                      |
+| `GET /api/signals`                            | List signals                            |
+| `GET /api/profile?user_id=...`                | Fetch a persona profile                 |
+| `GET /api/alerts?user_id=...`                 | Get role-relevant alerts                |
+| `GET /api/pipeline?user_id=...&signal_id=...` | Run the full pipeline                   |
+| `GET /api/progress?user_id=...&signal_id=...` | Run Progress Agent                      |
+| `GET /api/replan?user_id=...&signal_id=...`   | Check progress and re-plan if necessary |
+
+The alerts endpoint intentionally performs lightweight role matching first instead of running the full Bedrock pipeline for every alert.
+
+---
+
+# Frontend
+
+**File:** `frontend/index.html`
+
+The frontend demonstrates the complete CareerGuardian experience:
+
+```text
+Choose Persona
+      ↓
+View Profile
+      ↓
+View Current Skills
+      ↓
+View Relevant Disruptions
+      ↓
+Open Disruption
+      ↓
+Run Agent Pipeline
+      ↓
+View Impact
+      ↓
+View Personalised Plan
+      ↓
+View Adjacent Careers
+      ↓
+Check Progress
+      ↓
+Re-plan if needed
+```
+
+The current frontend is a hackathon demo rather than a production application.
+
+---
+
+# Example Persona
+
+The repository includes a demo software engineer persona:
+
+### Sarah Tan
+
+```text
+Role: Software Engineer
+Experience: 5 years
+Location: Singapore
+```
+
+Her current skills include areas such as:
+
+* Python
+* Java
+* SQL
+* Git
+* REST APIs
+* Backend Development
+* Unit Testing
+
+Her skill gaps include areas such as:
+
+* AI-Assisted Software Development
+* LLM Application Development
+* Prompt / Context Engineering
+* Cloud Deployment
+* AI System Integration
+* MLOps / AI Evaluation Fundamentals
+
+This makes her a useful example for demonstrating how an AI-related disruption is translated into personalised career action.
+
+---
+
+# Example Disruption
+
+A representative signal is `SIG001`, which concerns the increasing adoption of agentic AI and coding agents.
+
+The intended reasoning chain is:
+
+```text
+SIG001
+  ↓
+Software engineering role affected
+  ↓
+Which tasks are affected?
+  ↓
+Which skill gaps matter?
+  ↓
+What should the person learn?
+  ↓
+Generate 30/60/90 plan
+  ↓
+Which adjacent careers are relevant?
+  ↓
+Monitor progress
+```
+
+---
+
+# Guardrails
+
+CareerGuardian intentionally separates model reasoning from trusted application data.
+
+### Resource validation
+
+Planner can only use `resource_id` values present in the actual resource catalogue.
+
+### Structured validation
+
+Planner validates:
+
+* phase count
+* phase order
+* required fields
+* resource IDs
+* basic output structure
+
+### Person-specific grounding
+
+Role Intelligence is grounded in the person's actual:
+
+```text
+role
+tasks
+skills
+skill gaps
+```
+
+rather than generic assumptions about their profession.
+
+### No-plan handling
+
+When a signal does not affect a person, Planner can return without generating an unnecessary generic learning plan.
+
+---
+
+# Testing
+
+The repository currently includes a basic data-load sanity test:
+
+```bash
+python tests/test_load.py
+```
+
+The current test coverage focuses mainly on verifying that expected data has been successfully loaded into DynamoDB.
+
+A more complete automated regression suite is still a future improvement.
+
+---
+
+# Running the Demo
+
+## 1. Install dependencies
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+## 2. Configure AWS
+
+Configure access to:
+
+* Amazon Bedrock
+* Amazon DynamoDB
+* Amazon S3
+
+Set the required configuration values used by `scripts/config.py`.
+
+Do not commit AWS credentials or secrets to GitHub.
+
+## 3. Create tables
+
+```bash
+python scripts/create_table.py
+```
+
+## 4. Load data
+
+```bash
+python scripts/load_data.py
+```
+
+## 5. Start the API
+
+```bash
+uvicorn api.main:app --reload --port 8000
+```
+
+## 6. Open the frontend
+
+Open:
+
+```text
+frontend/index.html
+```
+
+---
+
+# Project Structure
+
+```text
+SimplifyNext-Hackathon-3braincells/
+│
+├── agents/
+│   ├── signal_agent.py
+│   ├── role_intelligence_agent.py
+│   ├── planner_agent.py
+│   ├── pathfinder_agent.py
+│   ├── progress_agent.py
+│   └── pipeline.py
+│
+├── api/
+│   └── main.py
+│
+├── frontend/
+│   └── index.html
+│
+├── data/
+│   ├── personas.csv
+│   ├── current_skills.csv
+│   ├── role_tasks.csv
+│   ├── skill_gaps.csv
+│   ├── signals.csv
+│   ├── resources.csv
+│   ├── plans_30_60_90.csv
+│   ├── pathfinder.csv
+│   └── progress.csv
+│
+├── scripts/
+│   ├── config.py
+│   ├── create_table.py
+│   ├── load_data.py
+│   └── bedrock_test.py
+│
+├── tests/
+│   └── test_load.py
+│
+├── requirements.txt
+└── README.md
+```
+
+---
+
+# Current Status
+
+| Component                            | Status             |
+| ------------------------------------ | ------------------ |
+| Data model                           | ✅ Implemented      |
+| S3 → DynamoDB ingestion              | ✅ Implemented      |
+| DynamoDB table creation              | ✅ Implemented      |
+| Signal Agent                         | ✅ Implemented      |
+| Role Intelligence Agent              | ✅ Implemented      |
+| Planner Agent                        | ✅ Implemented      |
+| Planner resource validation          | ✅ Implemented      |
+| Pathfinder Agent                     | ✅ Implemented      |
+| Progress Agent                       | ✅ Implemented      |
+| Agent pipeline                       | ✅ Implemented      |
+| FastAPI backend                      | ✅ Implemented      |
+| Browser demo                         | ✅ Implemented      |
+| Progress/replanning endpoint         | ✅ Implemented      |
+| Comprehensive integration tests      | ⚠️ Limited         |
+| Production authentication            | ❌ Not implemented  |
+| Resume parsing                       | ❌ Not implemented  |
+| Lambda/API Gateway deployment        | ❌ Not implemented  |
+| Planner/Progress saved-plan contract | ⚠️ Needs alignment |
+
+---
+
+# Known Limitations
+
+### Planner and Progress use different saved-plan table paths
+
+The current Planner and Progress implementations do not yet use the same saved-plan table.
+
+Planner currently saves through the `plans` table path, while Progress looks for generated plans through `generated_plans`.
+
+This should be aligned before treating the persistent re-planning loop as production-ready.
+
+### Local API deployment
+
+The current backend is intended for the hackathon demo and runs through local FastAPI rather than a deployed Lambda/API Gateway architecture.
+
+### Demo authentication and resume flow
+
+The frontend uses preloaded personas. Production authentication and live resume parsing are not currently implemented.
+
+---
+
+# Why CareerGuardian?
+
+Career disruption is not the same for everyone.
+
+The same technology change can:
+
+* remove some tasks
+* change other tasks
+* create new skill requirements
+* make some adjacent careers more attractive
+* require a different learning strategy over time
+
+CareerGuardian is designed to continuously connect those changes to the individual:
+
+```text
+What changed?
+     ↓
+Why does it matter to me?
+     ↓
+What should I learn?
+     ↓
+What could I become?
+     ↓
+Am I keeping up?
+     ↓
+Should my plan change?
+```
+
+That is the core idea behind CareerGuardian:
+
+> **Don't just predict which jobs will change. Help the individual respond to that change.**
