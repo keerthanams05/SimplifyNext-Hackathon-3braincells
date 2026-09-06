@@ -71,6 +71,9 @@ TABLE_SCHEMA = {
     # Finder organises its links around.
     "saved_roles": ("user_id", "target_role"),
     "opportunities": ("opportunity_id", None),
+    # Cached pipeline results, so a repeat click doesn't pay for six
+    # Bedrock calls again. Key is user + signal + model.
+    "pipeline_cache": ("cache_key", None),
 }
 
 # Maps each DynamoDB table to the CSV file that feeds it, and which

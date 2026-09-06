@@ -333,7 +333,8 @@ def list_agents():
 
 @app.get("/api/pipeline")
 def get_pipeline_result(
-    user_id: str, signal_id: str, model: str = "claude", explain: bool = True, parallel: bool = True
+    user_id: str, signal_id: str, model: str = "claude", explain: bool = True,
+    parallel: bool = True, fresh: bool = False,
 ):
     """The main endpoint: runs every agent for one persona + signal.
 
@@ -342,7 +343,8 @@ def get_pipeline_result(
     carries a `timings` block saying where the time actually went — pass
     parallel=false to compare against the old one-at-a-time behaviour."""
     try:
-        return run_full_pipeline(user_id, signal_id, model_key=model, explain=explain, parallel=parallel)
+        return run_full_pipeline(user_id, signal_id, model_key=model, explain=explain,
+                                 parallel=parallel, use_cache=not fresh)
     except MissingDataError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except AgentOutputError as e:

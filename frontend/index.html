@@ -164,6 +164,11 @@
   .res-name { font-size: 12px; font-weight: 700; }
   .res-meta { font-size: 10.5px; color: var(--muted); }
 
+  .footnote { text-align: center; font-size: 11.5px; color: var(--muted); padding: 6px 0 2px; }
+  .linkish { background: none; border: none; font-family: var(--ui); font-size: 11.5px;
+             font-weight: 700; color: var(--peri-ink); cursor: pointer; text-decoration: underline;
+             padding: 0 2px; }
+
   .meter { height: 10px; border-radius: 999px; background: #F1EFEA; overflow: hidden;
            border: 1.5px solid var(--line); }
   .meter > i { display: block; height: 100%; background: var(--butter-line); }
@@ -597,13 +602,14 @@ function startLoading(target, lines) {
 
 function stopLoading() { clearInterval(loadingTimer); loadingTimer = null; }
 
-async function openSignal(signalId) {
+async function openSignal(signalId, { fresh = false } = {}) {
   state.currentSignal = signalId;
   show("s-detail");
   startLoading("detailBody", LOADING_LINES);
 
   try {
-    const data = await api(`/api/pipeline?user_id=${state.userId}&signal_id=${encodeURIComponent(signalId)}`);
+    const data = await api(`/api/pipeline?user_id=${state.userId}` +
+      `&signal_id=${encodeURIComponent(signalId)}${fresh ? "&fresh=true" : ""}`);
     state.pipeline = data;
     stopLoading();
     renderDetail(data);
@@ -748,13 +754,22 @@ function renderDetail(d) {
     html += step("b1", "PS", "Path Scout", "Where else could you go from here?", inner, null);
   }
 
-  if (d.timings) {
-    html += `<div class="small" style="text-align:center;padding:6px 0">
+  // Be straight about whether this actually just ran. A cached result
+  // shown as if it were live would be the wrong kind of demo.
+  if (d.cached) {
+    html += `<div class="footnote">
+      Shown from an earlier run${d.cached_at ? ` (${esc(String(d.cached_at).slice(0, 10))})` : ""}.
+      <button class="linkish" id="runLive">Run it live again</button></div>`;
+  } else if (d.timings) {
+    html += `<div class="footnote">
       ${Object.keys(d.timings).length - 2} agents · ${esc(d.timings.total_wall_clock)}s
       (${esc(d.timings.sum_of_agents)}s of work, overlapped)</div>`;
   }
 
   $("detailBody").innerHTML = html;
+
+  const runLive = $("runLive");
+  if (runLive) runLive.addEventListener("click", () => openSignal(d.signal_id, { fresh: true }));
 
   document.querySelectorAll("[data-save]").forEach(btn =>
     btn.addEventListener("click", async () => {

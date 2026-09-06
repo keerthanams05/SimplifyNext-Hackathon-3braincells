@@ -761,6 +761,27 @@ When a signal does not affect a person, Planner can return without generating an
 
 # Testing it locally
 
+## 0. Warm the cache before demoing
+
+The full chain is ~20 seconds and six Bedrock calls. Results are cached per
+user+signal+model, so the *second* click on a story is instant — but the first
+one still waits. Warm the pairs you'll actually show:
+
+```bash
+python scripts/prewarm.py              # first alert for every persona
+python scripts/prewarm.py --user USER004
+python scripts/prewarm.py --list       # what's cached now
+python scripts/prewarm.py --clear      # start over
+```
+
+It prints the plan and what it'll cost before running, since this spends real
+money on the shared budget.
+
+Anything you didn't warm still runs live, and every result carries a **"Run it
+live again"** button — so when a judge asks whether it's real, you can show the
+agents actually working. The app is explicit about which one you're looking at:
+a cached result says so and gives you that button.
+
 ## 1. Is everything wired up?
 
 ```bash
