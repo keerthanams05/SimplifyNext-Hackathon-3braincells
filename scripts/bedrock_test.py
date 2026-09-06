@@ -1,6 +1,6 @@
 """
 Confirms Bedrock model access works for both models the team is planning
-to use, before anyone builds real agent logic on top of them.
+to use, before building real agent logic on top of them.
 
 Usage:
     python scripts/bedrock_test.py

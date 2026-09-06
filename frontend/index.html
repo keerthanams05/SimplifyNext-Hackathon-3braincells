@@ -1,0 +1,344 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>CareerGuardian</title>
+<style>
+  body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; max-width: 900px; margin: 40px auto; padding: 0 20px; color: #1a1a1a; }
+  h1 { margin-bottom: 4px; }
+  .subtitle { color: #666; margin-top: 0; }
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  /* Login screen */
+  .account-list { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 24px; }
+  .account-card { border: 1px solid #e2e2e2; border-radius: 12px; padding: 20px; width: 180px; text-align: center; cursor: pointer; background: #fafafa; transition: transform 0.1s; }
+  .account-card:hover { border-color: #2563eb; transform: translateY(-2px); }
+  .avatar { width: 56px; height: 56px; border-radius: 50%; background: #2563eb; color: white; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 600; margin: 0 auto 10px; }
+  .account-card h3 { margin: 4px 0; font-size: 15px; }
+  .account-card p { margin: 0; font-size: 13px; color: #777; }
+
+  /* Profile screen */
+  .profile-header { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+  .profile-header .avatar { width: 64px; height: 64px; font-size: 26px; margin: 0; }
+  .skill-chip { display: inline-block; background: #eef2ff; color: #3730a3; padding: 4px 12px; border-radius: 999px; font-size: 13px; margin: 3px; }
+  .upload-box { border: 2px dashed #ccc; border-radius: 10px; padding: 20px; text-align: center; margin: 16px 0; color: #888; }
+  .upload-box.done { border-color: #16a34a; color: #16a34a; background: #f0fdf4; }
+
+  /* Dashboard */
+  .alert-card { border: 1px solid #e2e2e2; border-left: 4px solid #dc2626; border-radius: 10px; padding: 14px 18px; margin-bottom: 12px; background: #fff; cursor: pointer; }
+  .alert-card:hover { background: #fafafa; }
+  .alert-card h3 { margin: 0 0 4px 0; font-size: 16px; }
+  .alert-card p { margin: 0; font-size: 13px; color: #777; }
+
+  /* Progress */
+  .progress-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #f0f0f0; }
+  .progress-item:last-child { border-bottom: none; }
+  .progress-item.behind strong { color: #b91c1c; }
+  .progress-bar-track { flex: 1; height: 6px; background: #eee; border-radius: 999px; margin: 0 12px; overflow: hidden; }
+  .progress-bar-fill { height: 100%; background: #2563eb; }
+  .progress-item.behind .progress-bar-fill { background: #dc2626; }
+  .replan-banner { background: #fef3c7; color: #92400e; padding: 10px 14px; border-radius: 8px; margin-bottom: 12px; font-size: 14px; }
+
+  /* Shared */
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; margin-left: 8px; }
+  .badge.high { background: #fee2e2; color: #b91c1c; }
+  .badge.medium { background: #fef3c7; color: #92400e; }
+  .badge.low { background: #dcfce7; color: #166534; }
+  .card { border: 1px solid #e2e2e2; border-radius: 10px; padding: 18px 20px; margin-bottom: 18px; background: #fafafa; }
+  .card h2 { margin-top: 0; font-size: 18px; }
+  .task-item, .gap-item, .resource-item, .pivot-item { border-left: 3px solid #2563eb; padding: 6px 12px; margin: 8px 0; background: white; border-radius: 4px; }
+  .phase { margin: 14px 0; padding: 12px; background: white; border-radius: 8px; border: 1px solid #eee; }
+  .phase h3 { margin: 0 0 6px 0; }
+  .empty-note { color: #888; font-style: italic; }
+  .loading, .error { padding: 20px; text-align: center; }
+  .error { color: #b91c1c; }
+  button, .link-btn { padding: 8px 14px; font-size: 14px; border-radius: 6px; border: 1px solid #ccc; background: white; cursor: pointer; }
+  .primary { background: #2563eb; color: white; border: none; }
+  .back-btn { margin-bottom: 16px; }
+</style>
+</head>
+<body>
+
+<h1>CareerGuardian</h1>
+<p class="subtitle">See how AI/tech disruption affects your specific role, and what to do about it.</p>
+
+<!-- SCREEN 1: LOGIN -->
+<div id="screen-login" class="screen active">
+  <h2>Who's logging in?</h2>
+  <div id="accountList" class="account-list"><p>Loading accounts...</p></div>
+</div>
+
+<!-- SCREEN 2: PROFILE -->
+<div id="screen-profile" class="screen">
+  <div class="profile-header">
+    <div class="avatar" id="profileAvatar">?</div>
+    <div>
+      <h2 id="profileName" style="margin:0;">—</h2>
+      <p style="margin:0; color:#666;" id="profileRole">—</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Your current skills</h2>
+    <div id="skillChips"></div>
+  </div>
+
+  <div class="card">
+    <h2>Resume</h2>
+    <div class="upload-box done">✓ Resume uploaded and skills extracted</div>
+    <p style="font-size:13px; color:#999;">(Demo note: this app already has your profile on file — a live version would parse a real uploaded resume here.)</p>
+  </div>
+
+  <button class="primary" id="goToDashboardBtn">Continue to Dashboard →</button>
+</div>
+
+<!-- SCREEN 3: DASHBOARD -->
+<div id="screen-dashboard" class="screen">
+  <button class="back-btn" onclick="showScreen('screen-profile')">← Back to Profile</button>
+
+  <div class="card">
+    <h2>Your Progress</h2>
+    <div id="progressPanel"><p>Loading progress...</p></div>
+  </div>
+
+  <h2>Your Career Alerts</h2>
+  <p style="color:#666;">Signals detected that are relevant to your role as <strong id="dashboardOccupation">—</strong>.</p>
+  <div id="alertList"></div>
+</div>
+
+<!-- SCREEN 4: DETAIL -->
+<div id="screen-detail" class="screen">
+  <button class="back-btn" onclick="showScreen('screen-dashboard')">← Back to Alerts</button>
+  <div id="detailResults"></div>
+</div>
+
+<script>
+const API_BASE = "http://localhost:8000";
+let currentUserId = null;
+let currentProfile = null;
+
+function showScreen(id) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+}
+
+function initials(name) {
+  return name.split(" ").map(w => w[0]).join("").toUpperCase();
+}
+
+async function loadAccounts() {
+  const personas = await fetch(`${API_BASE}/api/personas`).then(r => r.json());
+  const el = document.getElementById("accountList");
+  el.innerHTML = personas.map(p => `
+    <div class="account-card" onclick="login('${p.user_id}')">
+      <div class="avatar">${initials(p.name)}</div>
+      <h3>${p.name}</h3>
+      <p>${p.occupation}</p>
+    </div>
+  `).join("");
+}
+
+async function login(userId) {
+  currentUserId = userId;
+  currentProfile = await fetch(`${API_BASE}/api/profile?user_id=${userId}`).then(r => r.json());
+
+  document.getElementById("profileAvatar").textContent = initials(currentProfile.name);
+  document.getElementById("profileName").textContent = currentProfile.name;
+  document.getElementById("profileRole").textContent = `${currentProfile.occupation} · ${currentProfile.years_experience} yrs experience`;
+  document.getElementById("skillChips").innerHTML = currentProfile.skills
+    .map(s => `<span class="skill-chip">${s.skill} — ${s.proficiency}</span>`).join("");
+
+  showScreen("screen-profile");
+}
+
+async function loadProgress() {
+  const el = document.getElementById("progressPanel");
+  try {
+    const data = await fetch(`${API_BASE}/api/progress?user_id=${currentUserId}`).then(r => r.json());
+
+    if (!data.progress_items || data.progress_items.length === 0) {
+      el.innerHTML = `<p class="empty-note">No progress tracked yet — once you start on a plan, it'll show up here.</p>`;
+      return;
+    }
+
+    let html = "";
+    // NOTE: this dashboard-level check has no specific signal_id, so it
+    // can tell you general progress but not offer a re-plan tied to one
+    // plan — that button lives in the detail view instead (see viewAlert),
+    // where there IS a signal_id to re-plan against.
+    if (data.needs_replan) {
+      html += `<div class="replan-banner">You're falling behind on part of your plan — open one of your alerts below to get an updated plan for it.</div>`;
+    }
+    html += data.progress_items.map(p => {
+      const behind = (data.behind_items || []).includes(p.progress_id);
+      return `<div class="progress-item ${behind ? 'behind' : ''}">
+        <strong>${p.task}</strong>
+        <div class="progress-bar-track"><div class="progress-bar-fill" style="width:${p.completion_pct || 0}%"></div></div>
+        <small>${p.status} · ${p.completion_pct || 0}%</small>
+      </div>`;
+    }).join("");
+    if (data.explanation) {
+      html += `<p style="font-size:13px; color:#666; margin-top:10px;">${data.explanation}</p>`;
+    }
+    el.innerHTML = html;
+  } catch (e) {
+    el.innerHTML = `<p class="error">Couldn't load progress: ${e.message}</p>`;
+  }
+}
+
+async function triggerReplan(signalId, targetId = "progressPanel") {
+  const el = document.getElementById(targetId);
+  el.innerHTML = `<p>Generating an updated plan...</p>`;
+  try {
+    const data = await fetch(`${API_BASE}/api/replan?user_id=${currentUserId}&signal_id=${signalId}`).then(r => r.json());
+    if (!data.needs_replan) {
+      el.innerHTML = `<p class="empty-note">Looks like you're back on track — no new plan needed.</p>`;
+      return;
+    }
+    let html = `<p style="font-size:13px; color:#666;">${data.progress.explanation || ""}</p>`;
+    (data.plan.phases || []).forEach(phase => {
+      html += `<div class="phase">
+        <h3>${phase.phase} — ${phase.goal || ""}</h3>
+        <p><strong>Tasks:</strong> ${phase.tasks || ""}</p>
+      </div>`;
+    });
+    el.innerHTML = html;
+  } catch (e) {
+    el.innerHTML = `<p class="error">Couldn't generate a new plan: ${e.message}</p>`;
+  }
+}
+
+async function loadDashboard() {
+  document.getElementById("dashboardOccupation").textContent = currentProfile.occupation;
+  loadProgress();
+  const el = document.getElementById("alertList");
+  el.innerHTML = `<p>Loading alerts...</p>`;
+
+  const data = await fetch(`${API_BASE}/api/alerts?user_id=${currentUserId}`).then(r => r.json());
+
+  if (data.alerts.length === 0) {
+    el.innerHTML = `<p class="empty-note">No active disruption signals for your role right now.</p>`;
+    return;
+  }
+
+  el.innerHTML = data.alerts.map(a => `
+    <div class="alert-card" onclick="viewAlert('${a.signal_id}')">
+      <h3>${a.title} <span class="badge ${(a.severity||'').toLowerCase()}">${a.severity}</span></h3>
+      <p>${a.sector} · ${a.date}</p>
+    </div>
+  `).join("");
+}
+
+function severityBadge(severity) {
+  const cls = (severity || "").toLowerCase();
+  return `<span class="badge ${cls}">${severity}</span>`;
+}
+
+async function viewAlert(signalId) {
+  showScreen("screen-detail");
+  const el = document.getElementById("detailResults");
+  el.innerHTML = `<div class="loading">Analyzing how this affects you — running the full agent pipeline, may take 15-30 seconds...</div>`;
+
+  try {
+    const res = await fetch(`${API_BASE}/api/pipeline?user_id=${currentUserId}&signal_id=${signalId}`);
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || "Pipeline failed");
+    }
+    const data = await res.json();
+    renderDetail(data);
+    checkReplanForSignal(signalId);
+  } catch (e) {
+    el.innerHTML = `<div class="error">Error: ${e.message}</div>`;
+  }
+}
+
+async function checkReplanForSignal(signalId) {
+  try {
+    const progress = await fetch(`${API_BASE}/api/progress?user_id=${currentUserId}&signal_id=${signalId}`).then(r => r.json());
+    if (!progress.needs_replan) return;
+
+    const banner = document.createElement("div");
+    banner.className = "replan-banner";
+    banner.innerHTML = `You're behind schedule on this plan.
+      <button onclick="triggerReplan('${signalId}', 'replanResult')" style="margin-left:8px;">Get updated plan</button>
+      <div id="replanResult"></div>`;
+    document.getElementById("detailResults").prepend(banner);
+  } catch (e) {
+    // Non-critical — silently skip if progress data isn't available.
+  }
+}
+
+function renderDetail(data) {
+  const el = document.getElementById("detailResults");
+  const sig = data.signal || {};
+  const role = data.role_intelligence || {};
+  const plan = data.plan || {};
+  const pathfinder = data.pathfinder || {};
+
+  let html = `<div class="card">
+    <h2>${sig.title || data.signal_id} ${severityBadge(sig.severity)}</h2>
+    <p>${sig.reason || ""}</p>
+    <p><small>Relevance score: ${sig.relevance_score}/100</small></p>
+  </div>`;
+
+  html += `<div class="card"><h2>How this affects you</h2>`;
+  if (!role.affected_tasks || role.affected_tasks.length === 0) {
+    html += `<p class="empty-note">This signal doesn't significantly affect your current tasks.</p>`;
+  } else {
+    html += `<p>${role.explanation || ""}</p><h3>Affected tasks</h3>`;
+    role.affected_tasks.forEach(t => {
+      html += `<div class="task-item"><strong>${t.task}</strong> <small>(${t.skill_area})</small></div>`;
+    });
+    html += `<h3>Priority skill gaps</h3>`;
+    (role.skill_gaps || []).forEach(g => {
+      html += `<div class="gap-item"><strong>${g.skill}</strong> <small>Priority: ${g.gap_priority}</small></div>`;
+    });
+  }
+  html += `</div>`;
+
+  html += `<div class="card"><h2>Your 30/60/90-Day Plan</h2>`;
+  if (!plan.phases || plan.phases.length === 0) {
+    html += `<p class="empty-note">${plan.no_plan_reason || "No plan generated."}</p>`;
+  } else {
+    plan.phases.forEach(phase => {
+      html += `<div class="phase">
+        <h3>${phase.phase} — ${phase.goal || ""}</h3>
+        <p><strong>Milestones:</strong> ${phase.milestones || ""}</p>
+        <p><strong>Tasks:</strong> ${phase.tasks || ""}</p>
+        <p><strong>Hours/week:</strong> ${phase.hours_per_week || "—"}</p>`;
+      (phase.resources || []).forEach(r => {
+        html += `<div class="resource-item"><strong>${r.name}</strong> (${r.type}) — ${r.funding || "funding info n/a"}</div>`;
+      });
+      html += `</div>`;
+    });
+    html += `<p>${plan.explanation || ""}</p>`;
+  }
+  html += `</div>`;
+
+  html += `<div class="card"><h2>Adjacent career options for you</h2>`;
+  if (!pathfinder.pathfinder_options || pathfinder.pathfinder_options.length === 0) {
+    html += `<p class="empty-note">No adjacent-role data on file.</p>`;
+  } else {
+    pathfinder.pathfinder_options.forEach(p => {
+      html += `<div class="pivot-item">
+        <strong>${p.target_role}</strong> <small>(similarity: ${p.similarity_score}/100)</small>
+        <p>${p.signal_relevance_note || p.reason}</p>
+      </div>`;
+    });
+  }
+  html += `</div>`;
+
+  el.innerHTML = html;
+}
+
+document.getElementById("goToDashboardBtn").addEventListener("click", loadDashboard);
+document.getElementById("goToDashboardBtn").addEventListener("click", () => showScreen("screen-dashboard"));
+
+loadAccounts();
+</script>
+
+</body>
+</html>

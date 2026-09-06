@@ -3,3 +3,5 @@ pypdf
 pandas
 openpyxl
 python-dotenv
+fastapi
+uvicorn

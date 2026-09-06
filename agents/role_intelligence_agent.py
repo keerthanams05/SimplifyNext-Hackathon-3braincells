@@ -4,25 +4,34 @@ Role Intelligence Agent — second step in the demo pipeline.
 Takes a user_id + signal_id. Fetches that persona's own tasks and skill
 gaps, plus the signal, and asks a Bedrock model to determine which of
 THIS SPECIFIC PERSON's tasks and skill gaps are actually affected by
-THIS SPECIFIC SIGNAL, with an explanation — matching the contract in
-README.txt:
+THIS SPECIFIC SIGNAL, with an explanation — returning ONE merged object
+per affected item (not a bare ID list plus a separate detail list), so a
+frontend can render it directly:
 
     {
       "user_id": "USER001",
       "signal_id": "SIG001",
-      "affected_tasks": [...],
+      "affected_tasks": [
+        {"task_id": "TASK001", "task": "...", "skill_area": "..."}
+      ],
       "affected_skills": [...],
-      "skill_gaps": [...],
+      "skill_gaps": [
+        {"gap_id": "SKG001", "skill": "...", "gap_priority": "..."}
+      ],
       "explanation": "..."
     }
 
-Two guardrails baked into the prompt, both learned from testing the
-Signal Agent:
-  1. Grounded with today's real date + told not to fact-check sources
-     via its own memory (same fix as signal_agent.py).
+Two guardrails baked into the prompt, learned from testing the Signal Agent:
+  1. Grounded with today's real date + told not to fact-check sources via
+     its own memory.
   2. Explicitly told to ONLY pick task_id/gap_id values that actually
-     appear in the lists provided — otherwise models tend to invent
-     plausible-sounding IDs that don't exist in your data.
+     appear in the lists provided — a validate_ids() check afterward flags
+     it in a WARNING if the model invents one anyway.
+
+Fix from earlier testing: user_id/signal_id are ALWAYS set from the actual
+function arguments after parsing, never trusted from the model's own
+output — the model has no reliable way to "remember" values correctly if a
+prompt doesn't explicitly ask it to state them for a reason.
 
 Usage:
     python agents/role_intelligence_agent.py USER001 SIG001
@@ -78,9 +87,16 @@ will see signals and dates from after that cutoff — that is expected, not
 a sign of fabrication. Never reject or downgrade something just because you
 don't personally recognize it or can't verify it independently.
 
-You will be given ONE disruption signal and ONE person's current tasks and
-skill gaps. Decide which of THIS PERSON's tasks and skill gaps are actually
-affected by THIS SIGNAL, and explain why in plain language.
+You will be given ONE disruption signal, ONE person's current tasks and
+skill gaps, AND that same person's current skills with proficiency levels.
+Use the current skills as context, not as something to re-derive: if they
+already have strong proficiency in a skill closely related to a gap, that
+should temper (not erase) the gap's urgency in your explanation — e.g. an
+"Advanced" Python developer facing an "AI-Assisted Software Development"
+gap has a real gap, but a smaller distance to close than someone with no
+programming background at all. Decide which of THIS PERSON's tasks and
+skill gaps are actually affected by THIS SIGNAL, and explain why in plain
+language, referencing their existing skills where it's genuinely relevant.
 
 CRITICAL: you may ONLY use task_id values from this exact list: {valid_task_ids}
 and gap_id values from this exact list: {valid_gap_ids}. Do not invent new
@@ -99,7 +115,7 @@ exact shape:
 }}"""
 
 
-def build_user_prompt(signal: dict, tasks: list[dict], gaps: list[dict]) -> str:
+def build_user_prompt(signal: dict, tasks: list[dict], gaps: list[dict], skills: list[dict]) -> str:
     payload = {
         "signal": {
             "signal_id": signal.get("signal_id"),
@@ -125,6 +141,10 @@ def build_user_prompt(signal: dict, tasks: list[dict], gaps: list[dict]) -> str:
                 "gap_priority": g.get("gap_priority"),
             }
             for g in gaps
+        ],
+        "persons_current_skills": [
+            {"skill": s.get("skill"), "proficiency": s.get("proficiency")}
+            for s in skills
         ],
     }
     return json.dumps(payload, indent=2)
@@ -158,7 +178,36 @@ def validate_ids(result: dict, valid_task_ids: set, valid_gap_ids: set):
         print(f"  WARNING: model invented gap_ids not in the real data: {bad_gaps}")
 
 
-def run_role_intelligence_agent(user_id: str, signal_id: str, model_key: str = "claude") -> dict:
+def enrich_result(result: dict, user_id: str, signal_id: str, tasks: list[dict], gaps: list[dict]) -> dict:
+    """
+    Never trust the model to echo back values we already know — set them
+    ourselves. Also REPLACE the model's bare ID lists with the real,
+    trusted task/skill records looked up from our own data (not the
+    model) — one merged object per item, ready for a frontend to render
+    directly without a second lookup or having to zip two parallel arrays
+    together itself.
+    """
+    task_lookup = {t["task_id"]: t for t in tasks}
+    gap_lookup = {g["gap_id"]: g for g in gaps}
+
+    result["user_id"] = user_id
+    result["signal_id"] = signal_id
+
+    result["affected_tasks"] = [
+        {"task_id": tid, "task": task_lookup[tid]["task"], "skill_area": task_lookup[tid]["skill_area"]}
+        for tid in result.get("affected_tasks", [])
+        if tid in task_lookup
+    ]
+    result["skill_gaps"] = [
+        {"gap_id": gid, "skill": gap_lookup[gid]["skill"], "gap_priority": gap_lookup[gid]["gap_priority"]}
+        for gid in result.get("skill_gaps", [])
+        if gid in gap_lookup
+    ]
+
+    return result
+
+
+def run_role_intelligence_agent(user_id: str, signal_id: str, model_key: str = "claude", verbose: bool = True) -> dict:
     model_id = CLAUDE_MODEL_ID if model_key == "claude" else NOVA_MICRO_MODEL_ID
 
     signal = get_item("signals", {"signal_id": signal_id})
@@ -167,6 +216,7 @@ def run_role_intelligence_agent(user_id: str, signal_id: str, model_key: str = "
 
     tasks = query_by_user("role_tasks", user_id)
     gaps = query_by_user("skill_gaps", user_id)
+    skills = query_by_user("user_skills", user_id)  # not yet wired anywhere else — used here as context only
     if not tasks:
         raise ValueError(f"No role_tasks found for user_id={user_id}")
 
@@ -174,14 +224,16 @@ def run_role_intelligence_agent(user_id: str, signal_id: str, model_key: str = "
     valid_gap_ids = [g["gap_id"] for g in gaps]
 
     system_prompt = build_system_prompt(valid_task_ids, valid_gap_ids)
-    user_prompt = build_user_prompt(signal, tasks, gaps)
+    user_prompt = build_user_prompt(signal, tasks, gaps, skills)
 
     raw_output = call_model(system_prompt, user_prompt, model_id)
     result = parse_agent_json(raw_output)
     validate_ids(result, set(valid_task_ids), set(valid_gap_ids))
+    result = enrich_result(result, user_id, signal_id, tasks, gaps)
 
-    print(f"\nRole Intelligence verdict for {user_id} / {signal_id} (model: {model_id}):")
-    print(json.dumps(result, indent=2))
+    if verbose:
+        print(f"\nRole Intelligence verdict for {user_id} / {signal_id} (model: {model_id}):")
+        print(json.dumps(result, indent=2))
 
     return result
 

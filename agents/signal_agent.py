@@ -133,6 +133,19 @@ def parse_agent_json(raw_text: str) -> dict:
         raise ValueError(f"Model did not return valid JSON.\nRaw output:\n{raw_text}") from e
 
 
+def enrich_result(result: dict, signal: dict) -> dict:
+    """
+    Attach readable context the model wasn't asked to produce itself, pulled
+    from our own trusted signal record — so a frontend can show this result
+    directly without a separate lookup.
+    """
+    result["signal_id"] = signal["signal_id"]
+    result["title"] = signal.get("title")
+    result["sector"] = signal.get("sector")
+    result["technology"] = signal.get("technology")
+    return result
+
+
 def save_result(signal_id: str, result: dict):
     table = dynamodb.Table(table_name("signals"))
     table.update_item(
@@ -142,24 +155,27 @@ def save_result(signal_id: str, result: dict):
     )
 
 
-def run_signal_agent(signal_id: str, model_key: str = "claude", save: bool = False) -> dict:
+def run_signal_agent(signal_id: str, model_key: str = "claude", save: bool = False, verbose: bool = True) -> dict:
     model_id = CLAUDE_MODEL_ID if model_key == "claude" else NOVA_MICRO_MODEL_ID
 
     signal = get_signal(signal_id)
     user_prompt = build_user_prompt(signal)
     raw_output = call_model(SYSTEM_PROMPT, user_prompt, model_id)
     result = parse_agent_json(raw_output)
+    result = enrich_result(result, signal)
 
-    print(f"\nSignal Agent verdict for {signal_id} (model: {model_id}):")
-    print(json.dumps(result, indent=2))
+    if verbose:
+        print(f"\nSignal Agent verdict for {signal_id} (model: {model_id}):")
+        print(json.dumps(result, indent=2))
 
-    if "expected_signal_output" in signal:
-        print("\n(dataset reference — NOT shown to the agent, for your own sanity-check only)")
-        print(json.dumps(decimal_to_native(signal["expected_signal_output"]), indent=2))
+        if "expected_signal_output" in signal:
+            print("\n(dataset reference — NOT shown to the agent, for your own sanity-check only)")
+            print(json.dumps(decimal_to_native(signal["expected_signal_output"]), indent=2))
 
     if save:
         save_result(signal_id, result)
-        print(f"\nSaved agent_validated_output back to signals table for {signal_id}")
+        if verbose:
+            print(f"\nSaved agent_validated_output back to signals table for {signal_id}")
 
     return result
 

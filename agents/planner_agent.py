@@ -3,8 +3,9 @@ Planner Agent — third step in the demo pipeline.
 
 Takes a user_id + signal_id. Runs (or reuses) the Role Intelligence Agent's
 verdict for that pair, fetches the global resource catalogue, and asks a
-Bedrock model to produce a personalised 30/60/90-day upskilling plan —
-matching the shape of data/plans_30_60_90.csv:
+Bedrock model to produce a personalised 30/60/90-day upskilling plan, with
+each phase's resources returned as full merged objects (not bare IDs) so a
+frontend can render them directly:
 
     {
       "user_id": "USER001",
@@ -15,7 +16,9 @@ matching the shape of data/plans_30_60_90.csv:
           "goal": "...",
           "milestones": "...",
           "tasks": "...",
-          "resource_ids": ["RES001", "RES002"],
+          "resources": [
+            {"resource_id": "RES001", "name": "...", "type": "...", "funding": "..."}
+          ],
           "hours_per_week": 6
         },
         ... (Days 31-60, Days 61-90)
@@ -166,6 +169,31 @@ def validate_resource_ids(result: dict, valid_resource_ids: set):
         print(f"  WARNING: model invented resource_ids not in the catalogue: {bad}")
 
 
+def enrich_phases(result: dict, resources: list[dict]) -> dict:
+    """
+    REPLACE each phase's bare resource_ids list with full resource objects
+    looked up from our own trusted catalogue (not the model) — one merged
+    object per resource, ready for a frontend to render without a second
+    lookup or having to zip an ID list against a separate catalogue itself.
+    """
+    resource_lookup = {r["resource_id"]: r for r in resources}
+
+    for phase in result.get("phases", []):
+        phase["resources"] = [
+            {
+                "resource_id": rid,
+                "name": resource_lookup[rid].get("name"),
+                "type": resource_lookup[rid].get("type"),
+                "funding": resource_lookup[rid].get("funding"),
+            }
+            for rid in phase.get("resource_ids", [])
+            if rid in resource_lookup
+        ]
+        phase.pop("resource_ids", None)
+
+    return result
+
+
 def save_plan(result: dict):
     """Writes the generated plan back to DynamoDB (plan_id + user_id as a
     composite you'll need a table for — adjust to your actual schema in
@@ -176,12 +204,42 @@ def save_plan(result: dict):
     print(f"  Saved plan {plan_id} to DynamoDB.")
 
 
-def run_planner_agent(user_id: str, signal_id: str, model_key: str = "claude", save: bool = False) -> dict:
+def run_planner_agent(
+    user_id: str, signal_id: str, model_key: str = "claude", save: bool = False, verdict: dict = None,
+    verbose: bool = True,
+) -> dict:
     model_id = CLAUDE_MODEL_ID if model_key == "claude" else NOVA_MICRO_MODEL_ID
 
-    # Step 1: reuse Role Intelligence Agent's verdict rather than
-    # re-deriving affected tasks/gaps here.
-    verdict = run_role_intelligence_agent(user_id, signal_id, model_key=model_key)
+    # Reuse Role Intelligence Agent's verdict rather than re-deriving
+    # affected tasks/gaps here. If the caller already computed it (e.g.
+    # the pipeline orchestrator, which needs it standalone too), accept it
+    # directly instead of paying for a second, identical Bedrock call.
+    if verdict is None:
+        verdict = run_role_intelligence_agent(user_id, signal_id, model_key=model_key, verbose=verbose)
+
+    # Short-circuit: if this signal doesn't actually affect this person,
+    # don't call Bedrock to invent a plan anyway. Testing showed the model
+    # will fabricate a low-effort plan even for clearly irrelevant signals
+    # (e.g. a marketing-sector signal against a finance persona) if you
+    # let it try — so we skip the call entirely instead of relying on the
+    # model to say "no" on its own.
+    if not verdict.get("affected_tasks") and not verdict.get("skill_gaps"):
+        result = {
+            "user_id": user_id,
+            "signal_id": signal_id,
+            "phases": [],
+            "no_plan_reason": (
+                "Role Intelligence Agent found no affected tasks or skill gaps for this "
+                "person from this signal, so no upskilling plan was generated. "
+                f"Underlying explanation: {verdict.get('explanation', 'none provided')}"
+            ),
+        }
+        if verbose:
+            print(f"\nPlanner verdict for {user_id} / {signal_id}: SKIPPED (signal not relevant to this person)")
+            print(json.dumps(result, indent=2))
+        if save:
+            save_plan(result)
+        return result
 
     # Step 2: pull the global resource catalogue.
     resources = scan_all("resources")
@@ -198,9 +256,11 @@ def run_planner_agent(user_id: str, signal_id: str, model_key: str = "claude", s
     result["user_id"] = user_id
     result["signal_id"] = signal_id
     validate_resource_ids(result, set(valid_resource_ids))
+    result = enrich_phases(result, resources)
 
-    print(f"\nPlanner verdict for {user_id} / {signal_id} (model: {model_id}):")
-    print(json.dumps(result, indent=2))
+    if verbose:
+        print(f"\nPlanner verdict for {user_id} / {signal_id} (model: {model_id}):")
+        print(json.dumps(result, indent=2))
 
     if save:
         save_plan(result)
