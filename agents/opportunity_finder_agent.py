@@ -49,9 +49,8 @@ from boto3.dynamodb.conditions import Key
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 from config import AWS_REGION, BEDROCK_REGION, CLAUDE_MODEL_ID, NOVA_MICRO_MODEL_ID, table_name
+from aws_clients import dynamodb, bedrock  # thread-safe shared handles
 
-dynamodb = boto3.resource("dynamodb", region_name=AWS_REGION)
-bedrock = boto3.client("bedrock-runtime", region_name=BEDROCK_REGION)
 
 # The buckets the UI renders as sections. Plain language on purpose —
 # these are section headings a person reads, not internal categories.
@@ -60,7 +59,6 @@ GROUPS = {
     "People doing this already": ["Community", "Professional body", "Career service"],
     "Things to turn up to": ["Events", "Conference", "Hackathon", "Competition", "Industry news", "Research body"],
 }
-
 
 def decimal_to_native(obj):
     if isinstance(obj, list):

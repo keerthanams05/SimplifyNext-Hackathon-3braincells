@@ -34,13 +34,11 @@ import sys
 from datetime import date
 from pathlib import Path
 
-import boto3
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from config import BEDROCK_REGION, CLAUDE_MODEL_ID, NOVA_MICRO_MODEL_ID
-
-bedrock = boto3.client("bedrock-runtime", region_name=BEDROCK_REGION)
+from aws_clients import dynamodb, bedrock  # thread-safe shared handles
 
 SYSTEM_PROMPT = f"""You are the Explainer Agent in a career-guidance system for
 Singapore workers. You are the only agent in this system whose output is read

@@ -28,7 +28,6 @@ from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
-import boto3
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 from config import (  # noqa: E402
@@ -38,6 +37,7 @@ from config import (  # noqa: E402
     NOVA_MICRO_MODEL_ID,
     table_name,
 )
+from aws_clients import dynamodb, bedrock  # noqa: E402  thread-safe shared handles
 
 try:  # Keep compatibility with older config.py files.
     from config import AGENT_MODEL_TIER  # type: ignore  # noqa: E402
@@ -48,9 +48,6 @@ except ImportError:  # pragma: no cover - compatibility fallback
 # tasks/gaps here — keeps the two agents' verdicts consistent.
 from role_intelligence_agent import run_role_intelligence_agent  # noqa: E402
 
-
-dynamodb = boto3.resource("dynamodb", region_name=AWS_REGION)
-bedrock = boto3.client("bedrock-runtime", region_name=BEDROCK_REGION)
 
 EXPECTED_PHASES = ["Days 1-30", "Days 31-60", "Days 61-90"]
 MODEL_IDS = {

@@ -1,346 +1,721 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>CareerGuardian</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Career Guardian</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Karla:wght@400;500;600;700&display=swap">
 <style>
-  body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; max-width: 900px; margin: 40px auto; padding: 0 20px; color: #1a1a1a; }
-  h1 { margin-bottom: 4px; }
-  .subtitle { color: #666; margin-top: 0; }
+  :root {
+    --paper: #EFF1EE; --card: #FFFFFF;
+    --ink: #2C3140; --ink-soft: #565C70; --muted: #7C8296; --line: #E6E4DF;
+
+    --mint: #CFE8DA;   --mint-line: #86BCA3;   --mint-ink: #3F7A5C;
+    --blush: #F6D9DC;  --blush-line: #D79AA2;
+    --butter: #F8E4BC; --butter-line: #D9B36A; --butter-ink: #5C5342;
+    --peri: #D9DEF5;   --peri-line: #9AA5DE;   --peri-ink: #3F4668;
+    --clay: #F1DBC9;   --clay-line: #C99E7C;
+    --sky: #D2E5F0;    --sky-line: #8CB8D2;    --sky-ink: #3A5568;
+    --lilac: #E9E4F3;  --lilac-line: #B3A5D6;
+
+    --display: "Fraunces", Georgia, serif;
+    --ui: "Karla", "Segoe UI", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  /* The browser's own [hidden] rule is display:none at UA specificity, so
+     any class that sets display (.circ, .face, .nav) silently beats it and
+     the element stays visible. Everything toggled with el.hidden needs
+     this. */
+  [hidden] { display: none !important; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font-family: var(--ui); line-height: 1.55; font-size: 15px;
+  }
+  .app { max-width: 460px; margin: 0 auto; min-height: 100vh; background: #FCFBF9;
+         display: flex; flex-direction: column; box-shadow: 0 0 60px -30px rgba(44,49,64,0.4); }
+  .body { flex: 1; padding: 16px 18px 28px; display: flex; flex-direction: column; gap: 13px; }
+
+  h1, h2, h3 { font-family: var(--display); font-weight: 600; letter-spacing: -0.015em; margin: 0; }
+  .greet { font-size: 25px; line-height: 1.12; }
+  .ttl { font-size: 18px; }
+  .small { font-size: 12.5px; color: var(--muted); }
+  .row { display: flex; align-items: center; gap: 10px; }
+  .between { justify-content: space-between; }
+  .stack { display: flex; flex-direction: column; gap: 10px; }
+
+  .topbar { display: flex; align-items: center; justify-content: space-between;
+            padding: 16px 18px 4px; }
+  .circ { width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid var(--line);
+          background: #FFF; display: grid; place-items: center; font-size: 15px;
+          color: var(--muted); cursor: pointer; flex: none; }
+  .circ:hover { border-color: var(--muted); }
+  .face { width: 44px; height: 44px; border-radius: 15px; background: var(--clay);
+          border: 1.5px solid var(--clay-line); display: grid; place-items: center;
+          font-family: var(--display); font-size: 16px; font-weight: 600; flex: none; }
+
+  .block { border-radius: 18px; padding: 14px 15px; }
+  .mint { background: var(--mint); border: 1.5px solid var(--mint-line); }
+  .butter { background: var(--butter); border: 1.5px solid var(--butter-line); }
+  .peri { background: var(--peri); border: 1.5px solid var(--peri-line); }
+  .sky { background: var(--sky); border: 1.5px solid var(--sky-line); }
+  .lilac { background: var(--lilac); border: 1.5px solid var(--lilac-line); }
+  .plain { background: #FFF; border: 1.5px solid var(--line); }
+  .b-title { font-family: var(--display); font-size: 15.5px; font-weight: 600; }
+
+  .tag { font-size: 10px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase;
+         padding: 3px 9px; border-radius: 999px; white-space: nowrap;
+         background: rgba(255,255,255,0.75); border: 1px solid rgba(44,49,64,0.14); }
+
+  .track { height: 8px; border-radius: 999px; background: rgba(255,255,255,0.8);
+           overflow: hidden; border: 1px solid rgba(44,49,64,0.1); }
+  .track > i { display: block; height: 100%; background: var(--mint-line); transition: width 0.4s; }
+
+  .metric { display: flex; gap: 16px; margin-bottom: 11px; }
+  .metric .n { font-family: var(--display); font-size: 24px; font-weight: 600;
+               font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .metric .n span { font-family: var(--ui); font-size: 12px; font-weight: 500; color: var(--muted); }
+  .metric .k { font-size: 11px; color: var(--muted); }
+
+  .line-item { display: flex; gap: 10px; align-items: baseline; font-size: 13px; padding: 6px 0; }
+  .line-item + .line-item { border-top: 1px dashed rgba(44,49,64,0.16); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; transform: translateY(-1px); }
+
+  .badge { width: 32px; height: 32px; border-radius: 11px; display: grid; place-items: center;
+           font-family: var(--display); font-size: 12.5px; font-weight: 700;
+           border: 1.5px solid; flex: none; }
+  .badge.sm { width: 26px; height: 26px; border-radius: 9px; font-size: 11px; }
+  .b1 { background: var(--sky); border-color: var(--sky-line); }
+  .b2 { background: var(--butter); border-color: var(--butter-line); }
+  .b3 { background: var(--peri); border-color: var(--peri-line); }
+  .b4 { background: var(--mint); border-color: var(--mint-line); }
+  .b5 { background: var(--clay); border-color: var(--clay-line); }
+  .b6 { background: var(--blush); border-color: var(--blush-line); }
+  .b7 { background: var(--lilac); border-color: var(--lilac-line); }
+
+  .agent-row { display: flex; align-items: center; gap: 10px; padding: 9px 11px;
+               border-radius: 14px; background: #FFF; border: 1.5px solid var(--line); cursor: pointer; }
+  .agent-row.live { background: var(--mint); border-color: var(--mint-line); }
+  .agent-row.done { background: #FFF; }
+  .agent-row .nm { font-size: 13.5px; font-weight: 700; line-height: 1.2; }
+  .agent-row .q { font-size: 11.5px; color: var(--muted); line-height: 1.3; }
+  .state { margin-left: auto; font-size: 10px; font-weight: 700; color: var(--muted);
+           letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap; }
+  .state.ok { color: var(--mint-ink); }
+  .chain { padding-left: 22px; font-size: 10.5px; color: var(--muted); line-height: 1.7; }
+
+  .chip { font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 999px;
+          background: #FFF; border: 1.5px solid var(--line); cursor: pointer; }
+  .chip.on { background: var(--peri); border-color: var(--peri-line); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+  .pick { display: flex; gap: 11px; align-items: flex-start; padding: 12px 13px;
+          border-radius: 15px; background: #FFF; border: 1.5px solid var(--line); cursor: pointer;
+          transition: background 0.12s, border-color 0.12s; }
+  .pick.on { background: var(--mint); border-color: var(--mint-line); }
+  .tick { width: 23px; height: 23px; border-radius: 7px; flex: none; border: 1.5px solid var(--line);
+          background: #FFF; display: grid; place-items: center; font-size: 12px;
+          color: transparent; font-weight: 700; }
+  .pick.on .tick { border-color: var(--mint-line); color: var(--mint-ink); }
+  .pick .nm2 { font-size: 13.5px; font-weight: 700; line-height: 1.25; }
+  .pick .mt { font-size: 11.5px; color: var(--muted); line-height: 1.35; }
+
+  button.cta { border: none; border-radius: 14px; padding: 13px; width: 100%;
+               font-family: var(--ui); font-size: 13.5px; font-weight: 700;
+               background: var(--ink); color: #FCFBF9; cursor: pointer; }
+  button.cta:disabled { opacity: 0.45; cursor: default; }
+  button.ghost { background: #FFF; color: var(--muted); border: 1.5px solid var(--line); font-weight: 600; }
+
+  .seg { display: flex; gap: 4px; background: #F1EFEA; padding: 4px; border-radius: 13px; }
+  .seg button { flex: 1; border: none; background: transparent; font-family: var(--ui);
+                font-size: 12px; font-weight: 700; padding: 7px 4px; border-radius: 10px;
+                color: var(--muted); cursor: pointer; }
+  .seg button.on { background: #FFF; color: var(--ink); box-shadow: 0 1px 3px rgba(44,49,64,0.12); }
+
+  .link-row { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0;
+              text-decoration: none; color: inherit; }
+  .link-row + .link-row { border-top: 1px dashed rgba(44,49,64,0.14); }
+  .link-row .ic { width: 28px; height: 28px; border-radius: 9px; flex: none; display: grid;
+                  place-items: center; font-size: 11px; font-weight: 700; font-family: var(--display); }
+  .link-row .nm3 { font-size: 13px; font-weight: 700; line-height: 1.25; }
+  .link-row .meta { font-size: 11px; color: var(--muted); line-height: 1.3; }
+  .arrow { margin-left: auto; color: var(--muted); font-size: 14px; flex: none; }
+  .sect-h { font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+            color: var(--muted); margin-top: 4px; }
+
+  .phase { border-radius: 15px; border: 1.5px solid var(--line); background: #FFF;
+           padding: 12px 13px; cursor: pointer; }
+  .phase.on { background: var(--butter); border-color: var(--butter-line); }
+  .phase .ph { font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+               text-transform: uppercase; color: var(--muted); }
+  .phase .gl { font-family: var(--display); font-size: 14.5px; font-weight: 600;
+               line-height: 1.25; margin: 3px 0 6px; }
+
+  .meter { height: 10px; border-radius: 999px; background: #F1EFEA; overflow: hidden;
+           border: 1.5px solid var(--line); }
+  .meter > i { display: block; height: 100%; background: var(--butter-line); }
+  .quote { font-family: var(--display); font-size: 13.5px; line-height: 1.45; font-style: italic; }
+  .from { font-size: 10.5px; color: var(--muted); margin-top: 5px; }
+
+  .heart { margin-left: auto; font-size: 18px; line-height: 1; color: var(--blush-line);
+           cursor: pointer; background: none; border: none; padding: 0 2px; }
+  .heart.off { color: var(--line); }
+
+  .nav { display: flex; justify-content: space-around; padding: 11px 8px 16px;
+         border-top: 1.5px solid var(--line); background: #FFF; position: sticky; bottom: 0; }
+  .nav button { background: none; border: none; font-family: var(--ui); font-size: 10.5px;
+                font-weight: 600; color: var(--muted); display: flex; flex-direction: column;
+                align-items: center; gap: 5px; cursor: pointer; }
+  .nav button i { width: 18px; height: 18px; border-radius: 7px; background: #E6E4DF; display: block; }
+  .nav button.on { color: var(--ink); }
+  .nav button.on i { background: var(--butter); border: 1.5px solid var(--butter-line); }
+
   .screen { display: none; }
-  .screen.active { display: block; }
+  .screen.on { display: flex; flex-direction: column; gap: 13px; }
 
-  /* Login screen */
-  .account-list { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 24px; }
-  .account-card { border: 1px solid #e2e2e2; border-radius: 12px; padding: 20px; width: 180px; text-align: center; cursor: pointer; background: #fafafa; transition: transform 0.1s; }
-  .account-card:hover { border-color: #2563eb; transform: translateY(-2px); }
-  .avatar { width: 56px; height: 56px; border-radius: 50%; background: #2563eb; color: white; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 600; margin: 0 auto 10px; }
-  .account-card h3 { margin: 4px 0; font-size: 15px; }
-  .account-card p { margin: 0; font-size: 13px; color: #777; }
+  .accounts { display: flex; flex-direction: column; gap: 10px; }
+  .account { display: flex; align-items: center; gap: 12px; padding: 13px 14px;
+             border-radius: 16px; background: #FFF; border: 1.5px solid var(--line); cursor: pointer; }
+  .account:hover { border-color: var(--clay-line); }
+  .account .nm4 { font-size: 14.5px; font-weight: 700; }
 
-  /* Profile screen */
-  .profile-header { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
-  .profile-header .avatar { width: 64px; height: 64px; font-size: 26px; margin: 0; }
-  .skill-chip { display: inline-block; background: #eef2ff; color: #3730a3; padding: 4px 12px; border-radius: 999px; font-size: 13px; margin: 3px; }
-  .upload-box { border: 2px dashed #ccc; border-radius: 10px; padding: 20px; text-align: center; margin: 16px 0; color: #888; }
-  .upload-box.done { border-color: #16a34a; color: #16a34a; background: #f0fdf4; }
-
-  /* Dashboard */
-  .alert-card { border: 1px solid #e2e2e2; border-left: 4px solid #dc2626; border-radius: 10px; padding: 14px 18px; margin-bottom: 12px; background: #fff; cursor: pointer; }
-  .alert-card:hover { background: #fafafa; }
-  .alert-card h3 { margin: 0 0 4px 0; font-size: 16px; }
-  .alert-card p { margin: 0; font-size: 13px; color: #777; }
-
-  /* Progress */
-  .progress-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #f0f0f0; }
-  .progress-item:last-child { border-bottom: none; }
-  .progress-item.behind strong { color: #b91c1c; }
-  .progress-bar-track { flex: 1; height: 6px; background: #eee; border-radius: 999px; margin: 0 12px; overflow: hidden; }
-  .progress-bar-fill { height: 100%; background: #2563eb; }
-  .progress-item.behind .progress-bar-fill { background: #dc2626; }
-  .replan-banner { background: #fef3c7; color: #92400e; padding: 10px 14px; border-radius: 8px; margin-bottom: 12px; font-size: 14px; }
-
-  /* Shared */
-  .badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; margin-left: 8px; }
-  .badge.high { background: #fee2e2; color: #b91c1c; }
-  .badge.medium { background: #fef3c7; color: #92400e; }
-  .badge.low { background: #dcfce7; color: #166534; }
-  .card { border: 1px solid #e2e2e2; border-radius: 10px; padding: 18px 20px; margin-bottom: 18px; background: #fafafa; }
-  .card h2 { margin-top: 0; font-size: 18px; }
-  .task-item, .gap-item, .resource-item, .pivot-item { border-left: 3px solid #2563eb; padding: 6px 12px; margin: 8px 0; background: white; border-radius: 4px; }
-  .phase { margin: 14px 0; padding: 12px; background: white; border-radius: 8px; border: 1px solid #eee; }
-  .phase h3 { margin: 0 0 6px 0; }
-  .empty-note { color: #888; font-style: italic; }
-  .loading, .error { padding: 20px; text-align: center; }
-  .error { color: #b91c1c; }
-  button, .link-btn { padding: 8px 14px; font-size: 14px; border-radius: 6px; border: 1px solid #ccc; background: white; cursor: pointer; }
-  .primary { background: #2563eb; color: white; border: none; }
-  .back-btn { margin-bottom: 16px; }
+  .skeleton { height: 14px; border-radius: 999px; background: linear-gradient(90deg,#EFEDE8,#F7F5F1,#EFEDE8);
+              background-size: 200% 100%; animation: sh 1.2s infinite; }
+  @keyframes sh { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+  .err { border-radius: 14px; padding: 12px 14px; background: var(--blush);
+         border: 1.5px solid var(--blush-line); font-size: 12.5px; }
 </style>
 </head>
 <body>
+<div class="app">
 
-<h1>CareerGuardian</h1>
-<p class="subtitle">See how AI/tech disruption affects your specific role, and what to do about it.</p>
-
-<!-- SCREEN 1: LOGIN -->
-<div id="screen-login" class="screen active">
-  <h2>Who's logging in?</h2>
-  <div id="accountList" class="account-list"><p>Loading accounts...</p></div>
-</div>
-
-<!-- SCREEN 2: PROFILE -->
-<div id="screen-profile" class="screen">
-  <div class="profile-header">
-    <div class="avatar" id="profileAvatar">?</div>
-    <div>
-      <h2 id="profileName" style="margin:0;">—</h2>
-      <p style="margin:0; color:#666;" id="profileRole">—</p>
-    </div>
+  <div class="topbar">
+    <button class="circ" id="backBtn" hidden>‹</button>
+    <h2 class="ttl" id="screenTitle">Career Guardian</h2>
+    <div class="face" id="avatar" hidden>?</div>
   </div>
 
-  <div class="card">
-    <h2>Your current skills</h2>
-    <div id="skillChips"></div>
+  <div class="body">
+
+    <!-- LOGIN -->
+    <section class="screen on" id="s-login">
+      <p class="small">See what's changing in your work — and what to do about it.</p>
+      <div class="accounts" id="accountList"><div class="skeleton"></div></div>
+    </section>
+
+    <!-- HOME -->
+    <section class="screen" id="s-home">
+      <div class="row between">
+        <div>
+          <div class="greet" id="homeGreet">—</div>
+          <div class="small" id="homeSub">—</div>
+        </div>
+      </div>
+      <div id="homeAlert"></div>
+      <div id="homeProgress"></div>
+      <div class="block plain">
+        <div class="row between" style="margin-bottom:9px">
+          <span class="b-title">Watching for you</span>
+          <span class="small" id="homeRoleCount">—</span>
+        </div>
+        <div class="row" style="gap:5px" id="homeTeam"></div>
+      </div>
+    </section>
+
+    <!-- ROLES -->
+    <section class="screen" id="s-roles">
+      <p class="small">Star anything you're curious about. We watch the news for it every morning, even if you never do anything else about it.</p>
+      <div class="stack" id="rolesList"><div class="skeleton"></div></div>
+      <div class="block plain">
+        <div class="small" style="margin-bottom:9px">Roles near yours</div>
+        <div class="stack" id="suggestedRoles"><span class="small">Open an alert first — Path Scout fills this in.</span></div>
+      </div>
+    </section>
+
+    <!-- ALERTS -->
+    <section class="screen" id="s-alerts">
+      <p class="small" id="alertsSub">—</p>
+      <div class="stack" id="alertList"><div class="skeleton"></div></div>
+    </section>
+
+    <!-- DETAIL -->
+    <section class="screen" id="s-detail">
+      <div class="stack" id="detailBody"></div>
+    </section>
+
+    <!-- OPPORTUNITIES -->
+    <section class="screen" id="s-opps">
+      <div class="seg" id="oppTabs"></div>
+      <div class="stack" id="oppBody"><div class="skeleton"></div></div>
+    </section>
+
+    <!-- PREP -->
+    <section class="screen" id="s-prep">
+      <div class="stack" id="prepBody"><div class="skeleton"></div></div>
+    </section>
+
+    <!-- TEAM -->
+    <section class="screen" id="s-team">
+      <p class="small">Each one hands to the next. Tap any of them to see what it's for.</p>
+      <div class="stack" id="teamList"><div class="skeleton"></div></div>
+    </section>
   </div>
 
-  <div class="card">
-    <h2>Resume</h2>
-    <div class="upload-box done">✓ Resume uploaded and skills extracted</div>
-    <p style="font-size:13px; color:#999;">(Demo note: this app already has your profile on file — a live version would parse a real uploaded resume here.)</p>
+  <div class="nav" id="nav" hidden>
+    <button data-go="s-home" class="on"><i></i>Home</button>
+    <button data-go="s-alerts"><i></i>Alerts</button>
+    <button data-go="s-roles"><i></i>Roles</button>
+    <button data-go="s-opps"><i></i>Where</button>
+    <button data-go="s-prep"><i></i>Prep</button>
+    <button data-go="s-team"><i></i>Team</button>
   </div>
-
-  <button class="primary" id="goToDashboardBtn">Continue to Dashboard →</button>
-</div>
-
-<!-- SCREEN 3: DASHBOARD -->
-<div id="screen-dashboard" class="screen">
-  <button class="back-btn" onclick="showScreen('screen-profile')">← Back to Profile</button>
-
-  <div class="card">
-    <h2>Your Progress</h2>
-    <div id="progressPanel"><p>Loading progress...</p></div>
-  </div>
-
-  <h2>Your Career Alerts</h2>
-  <p style="color:#666;">Signals detected that are relevant to your role as <strong id="dashboardOccupation">—</strong>.</p>
-  <div id="alertList"></div>
-</div>
-
-<!-- SCREEN 4: DETAIL -->
-<div id="screen-detail" class="screen">
-  <button class="back-btn" onclick="showScreen('screen-dashboard')">← Back to Alerts</button>
-  <div id="detailResults"></div>
 </div>
 
 <script>
-const API_BASE = "http://localhost:8000";
-let currentUserId = null;
-let currentProfile = null;
+const API = "http://localhost:8000";
 
-function showScreen(id) {
-  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
-  document.getElementById(id).classList.add("active");
+const state = {
+  userId: null, profile: null, savedRoles: [], agents: [],
+  currentSignal: null, pipeline: null, oppRole: null, history: [],
+};
+
+// ---------- helpers ----------
+const $ = (id) => document.getElementById(id);
+// Everything from the API is rendered through this. The data is seeded and
+// trusted today, but a résumé bullet or a course name is still text we
+// didn't write, so it never goes in as raw HTML.
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const initials = (n) => String(n || "?").split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+
+async function api(path, opts) {
+  const res = await fetch(API + path, opts);
+  if (!res.ok) {
+    let detail = res.statusText;
+    try { detail = (await res.json()).detail || detail; } catch (e) { /* keep statusText */ }
+    throw new Error(detail);
+  }
+  return res.json();
 }
 
-function initials(name) {
-  return name.split(" ").map(w => w[0]).join("").toUpperCase();
+const TITLES = {
+  "s-login": "Career Guardian", "s-home": "Career Guardian", "s-roles": "Roles you're watching",
+  "s-alerts": "What's changed", "s-detail": "How this affects you",
+  "s-opps": "Where to go", "s-prep": "Ready to apply?", "s-team": "Who's on this",
+};
+
+function show(id, { push = true } = {}) {
+  if (push && id !== currentScreen()) state.history.push(currentScreen());
+  document.querySelectorAll(".screen").forEach(s => s.classList.toggle("on", s.id === id));
+  $("screenTitle").textContent = TITLES[id] || "Career Guardian";
+  $("backBtn").hidden = id === "s-login" || id === "s-home";
+  $("nav").hidden = id === "s-login";
+  $("avatar").hidden = !state.profile;
+  document.querySelectorAll("#nav button").forEach(b => b.classList.toggle("on", b.dataset.go === id));
+  window.scrollTo(0, 0);
+}
+const currentScreen = () => (document.querySelector(".screen.on") || {}).id || "s-login";
+
+function errorBlock(where, e) {
+  return `<div class="err"><b>${esc(where)} didn't load.</b><br>${esc(e.message)}
+    <div class="small" style="margin-top:6px">Is the API running? <code>uvicorn api.main:app --port 8000</code></div></div>`;
 }
 
+// ---------- login ----------
 async function loadAccounts() {
-  const personas = await fetch(`${API_BASE}/api/personas`).then(r => r.json());
-  const el = document.getElementById("accountList");
-  el.innerHTML = personas.map(p => `
-    <div class="account-card" onclick="login('${p.user_id}')">
-      <div class="avatar">${initials(p.name)}</div>
-      <h3>${p.name}</h3>
-      <p>${p.occupation}</p>
-    </div>
-  `).join("");
+  try {
+    const people = await api("/api/personas");
+    $("accountList").innerHTML = people.map(p => `
+      <div class="account" data-user="${esc(p.user_id)}">
+        <div class="face">${esc(initials(p.name))}</div>
+        <div><div class="nm4">${esc(p.name)}</div><div class="small">${esc(p.occupation)}</div></div>
+      </div>`).join("");
+    document.querySelectorAll(".account").forEach(el =>
+      el.addEventListener("click", () => login(el.dataset.user)));
+  } catch (e) {
+    $("accountList").innerHTML = errorBlock("Accounts", e);
+  }
 }
 
 async function login(userId) {
-  currentUserId = userId;
-  currentProfile = await fetch(`${API_BASE}/api/profile?user_id=${userId}`).then(r => r.json());
-
-  document.getElementById("profileAvatar").textContent = initials(currentProfile.name);
-  document.getElementById("profileName").textContent = currentProfile.name;
-  document.getElementById("profileRole").textContent = `${currentProfile.occupation} · ${currentProfile.years_experience} yrs experience`;
-  document.getElementById("skillChips").innerHTML = currentProfile.skills
-    .map(s => `<span class="skill-chip">${s.skill} — ${s.proficiency}</span>`).join("");
-
-  showScreen("screen-profile");
+  state.userId = userId;
+  state.profile = await api(`/api/profile?user_id=${encodeURIComponent(userId)}`);
+  $("avatar").textContent = initials(state.profile.name);
+  $("homeGreet").textContent = `Morning, ${state.profile.name.split(" ")[0]}`;
+  $("homeSub").textContent = `${state.profile.occupation} · ${state.profile.years_experience} years in`;
+  show("s-home", { push: false });
+  state.history = [];
+  loadHome();
+  loadAgents();
+  loadRoles();
 }
 
-async function loadProgress() {
-  const el = document.getElementById("progressPanel");
-  try {
-    const data = await fetch(`${API_BASE}/api/progress?user_id=${currentUserId}`).then(r => r.json());
+// ---------- home ----------
+async function loadHome() {
+  api(`/api/alerts?user_id=${state.userId}`).then(data => {
+    const a = (data.alerts || [])[0];
+    $("homeAlert").innerHTML = a ? `
+      <div class="block butter" data-signal="${esc(a.signal_id)}" style="cursor:pointer">
+        <div class="row between" style="margin-bottom:7px">
+          <span class="tag">Found for you</span><span class="tag">${esc(a.severity || "")}</span>
+        </div>
+        <div class="b-title" style="line-height:1.3;margin-bottom:5px">${esc(a.title)}</div>
+        <div class="small" style="color:var(--butter-ink)">${esc(a.sector)} · tap to see which of your tasks it touches</div>
+      </div>` : `<div class="block plain"><div class="small">Nothing new for your role right now.</div></div>`;
+    const card = $("homeAlert").firstElementChild;
+    if (a && card) card.addEventListener("click", () => openSignal(a.signal_id));
+  }).catch(e => { $("homeAlert").innerHTML = errorBlock("Alerts", e); });
 
-    if (!data.progress_items || data.progress_items.length === 0) {
-      el.innerHTML = `<p class="empty-note">No progress tracked yet — once you start on a plan, it'll show up here.</p>`;
-      return;
-    }
-
-    let html = "";
-    // NOTE: this dashboard-level check has no specific signal_id, so it
-    // can tell you general progress but not offer a re-plan tied to one
-    // plan — that button lives in the detail view instead (see viewAlert),
-    // where there IS a signal_id to re-plan against.
-    if (data.needs_replan) {
-      html += `<div class="replan-banner">You're falling behind on part of your plan — open one of your alerts below to get an updated plan for it.</div>`;
-    }
-    html += data.progress_items.map(p => {
-      const behind = (data.behind_items || []).includes(p.progress_id);
-      return `<div class="progress-item ${behind ? 'behind' : ''}">
-        <strong>${p.task}</strong>
-        <div class="progress-bar-track"><div class="progress-bar-fill" style="width:${p.completion_pct || 0}%"></div></div>
-        <small>${p.status} · ${p.completion_pct || 0}%</small>
+  api(`/api/progress?user_id=${state.userId}`).then(p => {
+    const items = p.progress_items || [];
+    const pct = items.length
+      ? Math.round(items.reduce((s, i) => s + Number(i.completion_pct || 0), 0) / items.length) : 0;
+    const behind = new Set(p.behind_items || []);
+    $("homeProgress").innerHTML = `
+      <div class="block mint">
+        <div class="row between" style="margin-bottom:10px">
+          <span class="b-title">Your plan</span>
+          <span class="tag">${items.length} tasks</span>
+        </div>
+        <div class="metric">
+          <div><div class="n">${pct}<span>%</span></div><div class="k">done so far</div></div>
+          <div><div class="n">${esc(state.profile.weekly_learning_hours ?? "—")}<span>hrs/wk</span></div><div class="k">what you told us</div></div>
+        </div>
+        <div class="track"><i style="width:${pct}%"></i></div>
+      </div>
+      <div class="block plain" style="margin-top:13px">
+        <div class="b-title" style="margin-bottom:7px">This week</div>
+        ${items.map(i => `<div class="line-item">
+            <span class="dot" style="background:${Number(i.completion_pct) >= 100 ? "var(--mint-line)"
+              : behind.has(i.progress_id) ? "var(--blush-line)" : "var(--butter-line)"}"></span>
+            <span>${esc(i.task)} — ${esc(i.status)}</span></div>`).join("")}
+        ${p.needs_replan ? `<div class="small" style="margin-top:9px;color:var(--blush-line)">
+            Falling behind on part of this — open an alert to rebuild the plan.</div>` : ""}
       </div>`;
+  }).catch(e => { $("homeProgress").innerHTML = errorBlock("Progress", e); });
+}
+
+// ---------- roles ----------
+const STATUS_STYLE = {
+  current: ["butter", "Now", "var(--butter-ink)"],
+  interested: ["mint", "Going for it", "var(--mint-ink)"],
+  watching: ["peri", "Just watching", "var(--peri-ink)"],
+};
+
+async function loadRoles() {
+  try {
+    state.savedRoles = await api(`/api/saved-roles?user_id=${state.userId}`);
+    $("homeRoleCount").textContent = `${state.savedRoles.length} roles`;
+    $("rolesList").innerHTML = state.savedRoles.map(r => {
+      const [cls, label, ink] = STATUS_STYLE[r.status] || STATUS_STYLE.watching;
+      return `<div class="block ${cls}">
+        <div class="row" style="margin-bottom:5px">
+          <span class="tag">${esc(label)}</span>
+          <button class="heart" data-unsave="${esc(r.target_role)}" title="Stop watching">♥</button>
+        </div>
+        <div class="b-title">${esc(r.target_role)}</div>
+        <div class="small" style="color:${ink}">${esc(r.note || r.role_family || "")}</div>
+      </div>`;
+    }).join("") || `<div class="small">No roles saved yet.</div>`;
+
+    document.querySelectorAll("[data-unsave]").forEach(btn =>
+      btn.addEventListener("click", () => unsaveRole(btn.dataset.unsave)));
+    buildOppTabs();
+  } catch (e) {
+    $("rolesList").innerHTML = errorBlock("Saved roles", e);
+  }
+}
+
+async function saveRole(targetRole, roleFamily, note) {
+  await api("/api/saved-roles", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      user_id: state.userId, target_role: targetRole,
+      status: "watching", role_family: roleFamily || "All", note: note || "",
+    }),
+  });
+  await loadRoles();
+}
+
+async function unsaveRole(targetRole) {
+  await api(`/api/saved-roles?user_id=${state.userId}&target_role=${encodeURIComponent(targetRole)}`,
+            { method: "DELETE" });
+  await loadRoles();
+}
+
+// ---------- alerts ----------
+async function loadAlerts() {
+  $("alertList").innerHTML = `<div class="skeleton"></div>`;
+  try {
+    const data = await api(`/api/alerts?user_id=${state.userId}`);
+    $("alertsSub").textContent = `Stories that could touch your work as ${data.occupation}.`;
+    $("alertList").innerHTML = (data.alerts || []).map(a => `
+      <div class="block plain" data-signal="${esc(a.signal_id)}" style="cursor:pointer">
+        <div class="row between" style="margin-bottom:6px">
+          <span class="tag">${esc(a.sector)}</span><span class="tag">${esc(a.severity || "")}</span>
+        </div>
+        <div class="b-title" style="line-height:1.3">${esc(a.title)}</div>
+        <div class="small">${esc(a.date || "")}</div>
+      </div>`).join("") || `<div class="small">Nothing active for your role right now.</div>`;
+    document.querySelectorAll("[data-signal]").forEach(el =>
+      el.addEventListener("click", () => openSignal(el.dataset.signal)));
+  } catch (e) {
+    $("alertList").innerHTML = errorBlock("Alerts", e);
+  }
+}
+
+// ---------- the pipeline view ----------
+const AGENT_WAVES = [
+  ["Signal Checker", "Role Reader", "Path Scout"],
+  ["Course Finder"], ["Plan Builder"], ["Translator"],
+];
+
+async function openSignal(signalId) {
+  state.currentSignal = signalId;
+  show("s-detail");
+  // The agents genuinely take time, so show WHO is working rather than a
+  // spinner — the wave structure below mirrors how the pipeline runs.
+  $("detailBody").innerHTML = `
+    <div class="block plain">
+      <div class="b-title" style="margin-bottom:4px">Your team is looking at this</div>
+      <div class="small" style="margin-bottom:11px">Three of them work at once, so this is quicker than it looks.</div>
+      <div class="stack" id="waveList"></div>
+    </div>`;
+  $("waveList").innerHTML = AGENT_WAVES.flat().map((n, i) => `
+    <div class="agent-row ${i < 3 ? "live" : ""}">
+      <div class="badge sm b${(i % 7) + 1}">${esc(n[0])}</div>
+      <div><div class="nm">${esc(n)}</div></div>
+      <span class="state">${i < 3 ? "Working" : "Waiting"}</span>
+    </div>`).join("");
+
+  try {
+    const data = await api(`/api/pipeline?user_id=${state.userId}&signal_id=${encodeURIComponent(signalId)}`);
+    state.pipeline = data;
+    renderDetail(data);
+  } catch (e) {
+    $("detailBody").innerHTML = errorBlock("The analysis", e);
+  }
+}
+
+function renderDetail(d) {
+  const sig = d.signal || {}, role = d.role_intelligence || {},
+        plan = d.plan || {}, path = d.pathfinder || {},
+        exp = d.explanation || {}, res = d.resources || {};
+  let html = "";
+
+  if (exp.headline) {
+    html += `<div class="block butter">
+      <div class="b-title" style="font-size:18px;line-height:1.25;margin-bottom:7px">${esc(exp.headline)}</div>
+      <div style="font-size:13.5px;color:var(--butter-ink)">${esc(exp.summary || "")}</div>
+      ${(exp.what_changed || []).length ? `<div style="margin-top:10px">${
+        exp.what_changed.map(w => `<div class="line-item"><span class="dot" style="background:var(--butter-line)"></span><span>${esc(w)}</span></div>`).join("")
+      }</div>` : ""}
+    </div>`;
+    if (exp.first_step) {
+      html += `<div class="block mint"><div class="b-title" style="margin-bottom:4px">Start here</div>
+        <div style="font-size:13.5px;color:var(--mint-ink)">${esc(exp.first_step)}</div></div>`;
+    }
+  }
+
+  html += `<div class="block plain">
+    <div class="row between" style="margin-bottom:6px">
+      <span class="b-title">${esc(sig.title || d.signal_id)}</span>
+      <span class="tag">${esc(sig.severity || "")}</span></div>
+    <div class="small">${esc(sig.reason || "")}</div></div>`;
+
+  const tasks = role.affected_tasks || [];
+  html += `<div class="block plain"><div class="b-title" style="margin-bottom:7px">Your tasks it touches</div>`;
+  html += tasks.length
+    ? tasks.map(t => `<div class="line-item"><span class="dot" style="background:var(--peri-line)"></span>
+        <span>${esc(typeof t === "string" ? t : (t.task || t.task_id))}</span></div>`).join("")
+      + `<div class="small" style="margin-top:8px">${esc(role.explanation || "")}</div>`
+    : `<div class="small">None of your tasks are affected by this one.</div>`;
+  html += `</div>`;
+
+  if ((res.matches || []).length) {
+    html += `<div class="block plain"><div class="b-title" style="margin-bottom:7px">Courses that fit your budget</div>
+      ${res.matches.flatMap(m => (m.resources || []).map(r => `
+        <div class="line-item"><span class="dot" style="background:var(--mint-line)"></span>
+        <span><b>${esc(r.name)}</b><br><span class="small">${esc(r.funding || "")}</span></span></div>`)).join("")}</div>`;
+  }
+
+  if ((plan.phases || []).length) {
+    html += `<div class="stack">${plan.phases.map((p, i) => `
+      <div class="phase ${i === 0 ? "on" : ""}">
+        <div class="ph">${esc(p.phase)}</div>
+        <div class="gl">${esc(p.goal || "")}</div>
+        <div class="small">${esc(p.tasks || "")}</div>
+        <div class="small" style="margin-top:5px">${esc(p.hours_per_week ?? "—")} hrs/week</div>
+      </div>`).join("")}</div>`;
+  } else if (plan.no_plan_reason) {
+    html += `<div class="block plain"><div class="small">${esc(plan.no_plan_reason)}</div></div>`;
+  }
+
+  const opts = path.pathfinder_options || [];
+  if (opts.length) {
+    html += `<div class="block plain"><div class="b-title" style="margin-bottom:8px">Where else you could go</div>
+      ${opts.map(o => {
+        const saved = state.savedRoles.some(r => r.target_role === o.target_role);
+        return `<div class="row between" style="padding:7px 0">
+          <div><div style="font-size:13.5px;font-weight:700">${esc(o.target_role)}</div>
+          <div class="small">${esc(o.similarity_score)}% of your experience carries over</div></div>
+          <button class="heart ${saved ? "" : "off"}" data-save="${esc(o.target_role)}">${saved ? "♥" : "♡"}</button>
+        </div>`;
+      }).join("")}
+      <div class="small" style="margin-top:6px">Star one and we'll watch the news for it too.</div></div>`;
+  }
+
+  if (d.timings) {
+    html += `<div class="small" style="text-align:center;padding:4px 0">
+      Seven helpers, ${esc(d.timings.total_wall_clock)}s
+      (${esc(d.timings.sum_of_agents)}s of work, overlapped)</div>`;
+  }
+
+  $("detailBody").innerHTML = html;
+  document.querySelectorAll("[data-save]").forEach(btn =>
+    btn.addEventListener("click", async () => {
+      const role = btn.dataset.save;
+      if (btn.classList.contains("off")) { await saveRole(role, state.profile.industry); btn.classList.remove("off"); btn.textContent = "♥"; }
+      else { await unsaveRole(role); btn.classList.add("off"); btn.textContent = "♡"; }
+    }));
+
+  // Path Scout's suggestions also feed the Roles screen.
+  if (opts.length) {
+    $("suggestedRoles").innerHTML = opts.map(o => {
+      const saved = state.savedRoles.some(r => r.target_role === o.target_role);
+      return `<div class="row between">
+        <div><div style="font-size:13.5px;font-weight:700">${esc(o.target_role)}</div>
+        <div class="small">${esc(o.similarity_score)}% fit</div></div>
+        <button class="heart ${saved ? "" : "off"}" data-save2="${esc(o.target_role)}">${saved ? "♥" : "♡"}</button></div>`;
     }).join("");
-    if (data.explanation) {
-      html += `<p style="font-size:13px; color:#666; margin-top:10px;">${data.explanation}</p>`;
-    }
-    el.innerHTML = html;
-  } catch (e) {
-    el.innerHTML = `<p class="error">Couldn't load progress: ${e.message}</p>`;
+    document.querySelectorAll("[data-save2]").forEach(btn =>
+      btn.addEventListener("click", () => saveRole(btn.dataset.save2, state.profile.industry)));
   }
 }
 
-async function triggerReplan(signalId, targetId = "progressPanel") {
-  const el = document.getElementById(targetId);
-  el.innerHTML = `<p>Generating an updated plan...</p>`;
+// ---------- opportunities ----------
+function buildOppTabs() {
+  $("oppTabs").innerHTML = state.savedRoles.map((r, i) =>
+    `<button data-role="${esc(r.target_role)}" class="${i === 0 ? "on" : ""}">${esc(r.target_role.split(" ")[0])}</button>`).join("");
+  document.querySelectorAll("#oppTabs button").forEach(b =>
+    b.addEventListener("click", () => {
+      document.querySelectorAll("#oppTabs button").forEach(x => x.classList.remove("on"));
+      b.classList.add("on");
+      loadOpportunities(b.dataset.role);
+    }));
+}
+
+const GROUP_ICON = { "Where the jobs are posted": "b4", "People doing this already": "b6", "Things to turn up to": "b3", "Courses": "b2" };
+
+async function loadOpportunities(role) {
+  state.oppRole = role || (state.savedRoles[0] || {}).target_role;
+  if (!state.oppRole) { $("oppBody").innerHTML = `<div class="small">Save a role first.</div>`; return; }
+  $("oppBody").innerHTML = `<div class="skeleton"></div>`;
   try {
-    const data = await fetch(`${API_BASE}/api/replan?user_id=${currentUserId}&signal_id=${signalId}`).then(r => r.json());
-    if (!data.needs_replan) {
-      el.innerHTML = `<p class="empty-note">Looks like you're back on track — no new plan needed.</p>`;
-      return;
+    const data = await api(`/api/opportunities?user_id=${state.userId}&role=${encodeURIComponent(state.oppRole)}`);
+    const p = (data.pathways || [])[0];
+    if (!p) { $("oppBody").innerHTML = `<div class="small">Nothing gathered for this pathway yet.</div>`; return; }
+    let html = p.why_now ? `<div class="block mint"><div class="small" style="color:var(--mint-ink)">${esc(p.why_now)}</div></div>` : "";
+    for (const [group, items] of Object.entries(p.groups || {})) {
+      html += `<div class="sect-h">${esc(group)}</div><div class="block plain" style="padding:4px 14px">`;
+      html += items.map(it => `
+        <a class="link-row" href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">
+          <div class="ic ${GROUP_ICON[group] || "b1"}">${esc(initials(it.name))}</div>
+          <div><div class="nm3">${esc(it.name)}</div>
+          <div class="meta">${esc(it.what_its_for || it.funding || it.provider || "")}</div></div>
+          <span class="arrow">↗</span></a>`).join("");
+      html += `</div>`;
     }
-    let html = `<p style="font-size:13px; color:#666;">${data.progress.explanation || ""}</p>`;
-    (data.plan.phases || []).forEach(phase => {
-      html += `<div class="phase">
-        <h3>${phase.phase} — ${phase.goal || ""}</h3>
-        <p><strong>Tasks:</strong> ${phase.tasks || ""}</p>
-      </div>`;
-    });
-    el.innerHTML = html;
+    $("oppBody").innerHTML = html;
   } catch (e) {
-    el.innerHTML = `<p class="error">Couldn't generate a new plan: ${e.message}</p>`;
+    $("oppBody").innerHTML = errorBlock("Opportunities", e);
   }
 }
 
-async function loadDashboard() {
-  document.getElementById("dashboardOccupation").textContent = currentProfile.occupation;
-  loadProgress();
-  const el = document.getElementById("alertList");
-  el.innerHTML = `<p>Loading alerts...</p>`;
-
-  const data = await fetch(`${API_BASE}/api/alerts?user_id=${currentUserId}`).then(r => r.json());
-
-  if (data.alerts.length === 0) {
-    el.innerHTML = `<p class="empty-note">No active disruption signals for your role right now.</p>`;
+// ---------- prep ----------
+async function loadPrep() {
+  $("prepBody").innerHTML = `<div class="skeleton"></div>`;
+  const target = (state.savedRoles.find(r => r.status === "interested") || {}).target_role;
+  if (!target) {
+    $("prepBody").innerHTML = `<div class="block plain"><div class="small">Star a role as "going for it" first — then the Prep Coach can build toward it.</div></div>`;
     return;
   }
-
-  el.innerHTML = data.alerts.map(a => `
-    <div class="alert-card" onclick="viewAlert('${a.signal_id}')">
-      <h3>${a.title} <span class="badge ${(a.severity||'').toLowerCase()}">${a.severity}</span></h3>
-      <p>${a.sector} · ${a.date}</p>
-    </div>
-  `).join("");
-}
-
-function severityBadge(severity) {
-  const cls = (severity || "").toLowerCase();
-  return `<span class="badge ${cls}">${severity}</span>`;
-}
-
-async function viewAlert(signalId) {
-  showScreen("screen-detail");
-  const el = document.getElementById("detailResults");
-  el.innerHTML = `<div class="loading">Analyzing how this affects you — running the full agent pipeline, may take 15-30 seconds...</div>`;
-
   try {
-    const res = await fetch(`${API_BASE}/api/pipeline?user_id=${currentUserId}&signal_id=${signalId}`);
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.detail || "Pipeline failed");
+    const d = await api(`/api/prep?user_id=${state.userId}&target_role=${encodeURIComponent(target)}`);
+    const r = d.readiness || {};
+    let html = `<div class="block butter">
+      <div class="row between" style="margin-bottom:8px">
+        <span class="b-title">${esc(r.verdict || "—")}</span><span class="tag">${esc(r.score ?? "—")} / 100</span></div>
+      <div class="meter" style="margin-bottom:8px"><i style="width:${Number(r.score) || 0}%"></i></div>
+      <div class="small" style="color:var(--butter-ink)">${esc(r.reason || "")}</div>
+      <div class="small" style="margin-top:6px">for <b>${esc(d.target_role)}</b></div></div>`;
+
+    if ((d.resume_bullets || []).length) {
+      html += `<div class="sect-h">Your CV, rewritten</div>`;
+      html += d.resume_bullets.map(b => `<div class="block plain">
+        <div class="quote">"${esc(b.bullet)}"</div>
+        <div class="from">↑ from your task: <b>${esc(b.from_task)}</b></div></div>`).join("");
     }
-    const data = await res.json();
-    renderDetail(data);
-    checkReplanForSignal(signalId);
+    if ((d.practice_questions || []).length) {
+      html += `<div class="sect-h">They'll probably ask</div>`;
+      html += d.practice_questions.map(q => `<div class="block lilac">
+        <div class="b-title" style="font-size:14px;line-height:1.35">"${esc(q.question)}"</div>
+        <div class="small" style="margin-top:6px">${esc(q.what_theyre_checking || "")}</div></div>`).join("");
+    }
+    if ((d.before_you_apply || []).length) {
+      html += `<div class="block plain"><div class="b-title" style="margin-bottom:7px">Before you apply</div>
+        ${d.before_you_apply.map(s => `<div class="line-item"><span class="dot" style="background:var(--mint-line)"></span><span>${esc(s)}</span></div>`).join("")}</div>`;
+    }
+    html += `<div class="small" style="text-align:center;padding:6px 0">Nothing here invents experience — every line names the task it came from.</div>`;
+    $("prepBody").innerHTML = html;
   } catch (e) {
-    el.innerHTML = `<div class="error">Error: ${e.message}</div>`;
+    $("prepBody").innerHTML = errorBlock("Prep Coach", e);
   }
 }
 
-async function checkReplanForSignal(signalId) {
+// ---------- team ----------
+async function loadAgents() {
   try {
-    const progress = await fetch(`${API_BASE}/api/progress?user_id=${currentUserId}&signal_id=${signalId}`).then(r => r.json());
-    if (!progress.needs_replan) return;
-
-    const banner = document.createElement("div");
-    banner.className = "replan-banner";
-    banner.innerHTML = `You're behind schedule on this plan.
-      <button onclick="triggerReplan('${signalId}', 'replanResult')" style="margin-left:8px;">Get updated plan</button>
-      <div id="replanResult"></div>`;
-    document.getElementById("detailResults").prepend(banner);
+    state.agents = await api("/api/agents");
+    $("homeTeam").innerHTML = state.agents.slice(0, 7).map((a, i) =>
+      `<div class="badge sm b${(i % 7) + 1}">${esc(a.name[0])}</div>`).join("");
+    $("teamList").innerHTML = state.agents.map((a, i) => `
+      <div class="agent-row" data-agent="${i}">
+        <div class="badge sm b${(i % 7) + 1}">${esc(a.name[0])}</div>
+        <div><div class="nm">${esc(a.name)}</div><div class="q">${esc(a.asks)}</div></div>
+        <span class="state">${esc((a.trigger || "").split(",")[0])}</span>
+      </div>
+      <div class="chain" data-detail="${i}" hidden></div>`).join("");
+    document.querySelectorAll("[data-agent]").forEach(el =>
+      el.addEventListener("click", () => {
+        const a = state.agents[el.dataset.agent];
+        const box = document.querySelector(`[data-detail="${el.dataset.agent}"]`);
+        box.hidden = !box.hidden;
+        box.innerHTML = `${esc(a.in_full)}<br><b>Reads:</b> ${esc((a.reads || []).join(", "))}
+          ${a.hands_to ? `<br><b>Hands to:</b> ${esc(a.hands_to)}` : ""}`;
+      }));
   } catch (e) {
-    // Non-critical — silently skip if progress data isn't available.
+    $("teamList").innerHTML = errorBlock("The team", e);
   }
 }
 
-function renderDetail(data) {
-  const el = document.getElementById("detailResults");
-  const sig = data.signal || {};
-  const role = data.role_intelligence || {};
-  const plan = data.plan || {};
-  const pathfinder = data.pathfinder || {};
+// ---------- wiring ----------
+document.querySelectorAll("#nav button").forEach(b =>
+  b.addEventListener("click", () => {
+    const id = b.dataset.go;
+    show(id, { push: false });
+    state.history = [];
+    if (id === "s-alerts") loadAlerts();
+    if (id === "s-opps") loadOpportunities(state.oppRole);
+    if (id === "s-prep") loadPrep();
+    if (id === "s-roles") loadRoles();
+  }));
 
-  let html = `<div class="card">
-    <h2>${sig.title || data.signal_id} ${severityBadge(sig.severity)}</h2>
-    <p>${sig.reason || ""}</p>
-    <p><small>Relevance score: ${sig.relevance_score}/100</small></p>
-  </div>`;
-
-  html += `<div class="card"><h2>How this affects you</h2>`;
-  if (!role.affected_tasks || role.affected_tasks.length === 0) {
-    html += `<p class="empty-note">This signal doesn't significantly affect your current tasks.</p>`;
-  } else {
-    html += `<p>${role.explanation || ""}</p><h3>Affected tasks</h3>`;
-    role.affected_tasks.forEach(t => {
-      html += `<div class="task-item"><strong>${t.task}</strong> <small>(${t.skill_area})</small></div>`;
-    });
-    html += `<h3>Priority skill gaps</h3>`;
-    (role.skill_gaps || []).forEach(g => {
-      html += `<div class="gap-item"><strong>${g.skill}</strong> <small>Priority: ${g.gap_priority}</small></div>`;
-    });
-  }
-  html += `</div>`;
-
-  html += `<div class="card"><h2>Your 30/60/90-Day Plan</h2>`;
-  if (!plan.phases || plan.phases.length === 0) {
-    html += `<p class="empty-note">${plan.no_plan_reason || "No plan generated."}</p>`;
-  } else {
-    plan.phases.forEach(phase => {
-      html += `<div class="phase">
-        <h3>${phase.phase} — ${phase.goal || ""}</h3>
-        <p><strong>Milestones:</strong> ${phase.milestones || ""}</p>
-        <p><strong>Tasks:</strong> ${phase.tasks || ""}</p>
-        <p><strong>Hours/week:</strong> ${phase.hours_per_week || "—"}</p>`;
-      (phase.resources || []).forEach(r => {
-        html += `<div class="resource-item"><strong>${r.name}</strong> (${r.type}) — ${r.funding || "funding info n/a"}</div>`;
-      });
-      html += `</div>`;
-    });
-    html += `<p>${plan.explanation || ""}</p>`;
-  }
-  html += `</div>`;
-
-  html += `<div class="card"><h2>Adjacent career options for you</h2>`;
-  if (!pathfinder.pathfinder_options || pathfinder.pathfinder_options.length === 0) {
-    html += `<p class="empty-note">No adjacent-role data on file.</p>`;
-  } else {
-    pathfinder.pathfinder_options.forEach(p => {
-      html += `<div class="pivot-item">
-        <strong>${p.target_role}</strong> <small>(similarity: ${p.similarity_score}/100)</small>
-        <p>${p.signal_relevance_note || p.reason}</p>
-      </div>`;
-    });
-  }
-  html += `</div>`;
-
-  el.innerHTML = html;
-}
-
-document.getElementById("goToDashboardBtn").addEventListener("click", () => {
-  showScreen("screen-dashboard");
-  loadDashboard();
-});
+$("backBtn").addEventListener("click", () => show(state.history.pop() || "s-home", { push: false }));
 
 loadAccounts();
 </script>
-
 </body>
 </html>

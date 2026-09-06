@@ -325,10 +325,17 @@ def list_agents():
 
 
 @app.get("/api/pipeline")
-def get_pipeline_result(user_id: str, signal_id: str, model: str = "claude", explain: bool = True):
-    """The main endpoint: runs every agent for one persona + signal."""
+def get_pipeline_result(
+    user_id: str, signal_id: str, model: str = "claude", explain: bool = True, parallel: bool = True
+):
+    """The main endpoint: runs every agent for one persona + signal.
+
+    The three agents that don't depend on each other run concurrently, so
+    this is roughly a third faster than it looks on paper. The response
+    carries a `timings` block saying where the time actually went — pass
+    parallel=false to compare against the old one-at-a-time behaviour."""
     try:
-        return run_full_pipeline(user_id, signal_id, model_key=model, explain=explain)
+        return run_full_pipeline(user_id, signal_id, model_key=model, explain=explain, parallel=parallel)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:

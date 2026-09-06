@@ -41,18 +41,15 @@ from decimal import Decimal
 from pathlib import Path
 from xml.etree import ElementTree
 
-import boto3
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 from config import AWS_REGION, BEDROCK_REGION, CLAUDE_MODEL_ID, NOVA_MICRO_MODEL_ID, table_name
+from aws_clients import dynamodb, bedrock  # thread-safe shared handles
 
-dynamodb = boto3.resource("dynamodb", region_name=AWS_REGION)
-bedrock = boto3.client("bedrock-runtime", region_name=BEDROCK_REGION)
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 USER_AGENT = "CareerGuardian/1.0 (hackathon project; daily career-signal scan)"
 FETCH_TIMEOUT = 15
-
 
 def decimal_to_native(obj):
     if isinstance(obj, list):

@@ -280,8 +280,29 @@ Bedrock model IDs and AWS/Bedrock regions live in `scripts/config.py`
 
 ```bash
 uvicorn api.main:app --reload --port 8000
-# then open frontend/index.html in a browser
+python -m http.server 8080 --directory frontend   # then open localhost:8080
 ```
+
+### Speed
+
+The chain is four waves, not six steps — Signal Checker, Role Reader and Path
+Scout don't depend on each other, so they run concurrently:
+
+```bash
+python agents/pipeline.py USER004 SIG016            # parallel (default)
+python agents/pipeline.py USER004 SIG016 --serial   # one at a time, to compare
+```
+
+Both print a `WHERE THE TIME WENT` table, and `/api/pipeline` returns the same
+numbers in a `timings` block, so this stays measured rather than assumed. The
+Course Finder call is also skipped entirely when Role Reader found nothing to
+plan for.
+
+This is only safe because every agent now shares thread-local AWS handles from
+`scripts/aws_clients.py`: boto3 *resources* are not thread-safe, and each
+thread gets its own Session-backed instance. If you add an agent, import
+`dynamodb`/`bedrock` from there rather than calling `boto3.resource()` at
+module level.
 
 | Endpoint | What it does |
 |----------|--------------|
@@ -310,15 +331,14 @@ uvicorn api.main:app --reload --port 8000
 - Not every `user_id` × `signal_id` combination has been run through the full
   pipeline end-to-end yet — USER004-006 in particular are unverified against
   live Bedrock.
-- **The full pipeline is 6 serial Bedrock calls.** Signal and Pathfinder don't
-  depend on Role Intelligence, so they could run concurrently — but the agents
-  share module-level `boto3.resource` objects, which aren't thread-safe, so
-  that needs a per-thread client before it's safe to parallelise.
+- The pipeline's slowest remaining step is the Planner, which can't start
+  until Role Reader and Course Finder are done. Everything that *can* overlap
+  already does.
 - **`/api/alerts` matches occupation to `affected_roles` by exact string.**
   All six personas match cleanly today; any wording drift silently empties
   someone's dashboard.
-- **The frontend interpolates API data straight into `innerHTML`.** Fine with
-  trusted seeded data, worth escaping before this goes anywhere real.
+- The frontend escapes all API data before rendering (`esc()`), but it is a
+  single static page with no auth — anyone who can reach the API is any user.
 - New resource rows (RES013-017) point at real Singapore schemes but their
   funding text defers to the official page — **verify before the demo**, same
   as the existing rows say.
@@ -336,6 +356,8 @@ uvicorn api.main:app --reload --port 8000
 - [x] Prep Coach (résumé + interview prep)
 - [x] Market Watcher — daily scan over saved roles
 - [x] Saved roles (star a future role, it joins the daily scan)
-- [ ] Front end rebuilt on the pastel design direction
-- [ ] Course Finder / Plan Builder as interactive pickers rather than
-      generated text (API returns options; the UI needs to render them)
+- [x] Front end rebuilt on the pastel design direction (`frontend/index.html`)
+- [x] Pipeline parallelised where the dependency graph allows
+- [ ] Course Finder / Plan Builder as interactive pickers — the screens exist
+      but currently render the agent's chosen set; letting the user re-pick and
+      re-plan needs a POST endpoint that takes their selection
