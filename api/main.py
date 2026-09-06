@@ -27,6 +27,7 @@ import boto3
 from boto3.dynamodb.conditions import Key
 
 from config import AWS_REGION, AGENT_MODEL_TIER, table_name
+from agent_errors import AgentOutputError, MissingDataError
 from pipeline import run_full_pipeline
 from progress_agent import run_progress_agent
 from planner_agent import run_planner_agent
@@ -336,10 +337,15 @@ def get_pipeline_result(
     parallel=false to compare against the old one-at-a-time behaviour."""
     try:
         return run_full_pipeline(user_id, signal_id, model_key=model, explain=explain, parallel=parallel)
-    except ValueError as e:
+    except MissingDataError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except AgentOutputError as e:
+        # The data is fine; Bedrock returned something unusable. Calling this
+        # a 404 sent people hunting for missing records that were never the
+        # problem.
+        raise HTTPException(status_code=502, detail=f"The model returned something we couldn't use: {e}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Pipeline error: {e}")
+        raise HTTPException(status_code=500, detail=f"Pipeline error: {type(e).__name__}: {e}")
 
 
 @app.get("/api/resources")
@@ -349,10 +355,15 @@ def get_resource_matches(user_id: str, model: str = "nova"):
     from a browse screen."""
     try:
         return run_resource_connector_agent(user_id, model_key=model, verbose=False)
-    except ValueError as e:
+    except MissingDataError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except AgentOutputError as e:
+        # The data is fine; Bedrock returned something unusable. Calling this
+        # a 404 sent people hunting for missing records that were never the
+        # problem.
+        raise HTTPException(status_code=502, detail=f"The model returned something we couldn't use: {e}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Resource connector error: {e}")
+        raise HTTPException(status_code=500, detail=f"Resource connector error: {type(e).__name__}: {e}")
 
 
 @app.get("/api/explain")
@@ -361,10 +372,15 @@ def explain(user_id: str, signal_id: str, model: str = "claude"):
     so prefer /api/pipeline?explain=true if you also need the data."""
     try:
         return run_explainer_agent(user_id, signal_id, model_key=model, verbose=False)
-    except ValueError as e:
+    except MissingDataError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except AgentOutputError as e:
+        # The data is fine; Bedrock returned something unusable. Calling this
+        # a 404 sent people hunting for missing records that were never the
+        # problem.
+        raise HTTPException(status_code=502, detail=f"The model returned something we couldn't use: {e}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Explainer error: {e}")
+        raise HTTPException(status_code=500, detail=f"Explainer error: {type(e).__name__}: {e}")
 
 
 @app.get("/api/progress")
@@ -375,8 +391,12 @@ def get_progress(user_id: str, signal_id: str = None, model: str = "nova"):
     dashboard load rather than only when the user clicks in."""
     try:
         return run_progress_agent(user_id, signal_id=signal_id, model_key=model, verbose=False)
+    except MissingDataError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except AgentOutputError as e:
+        raise HTTPException(status_code=502, detail=f"The model returned something we couldn't use: {e}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Progress agent error: {e}")
+        raise HTTPException(status_code=500, detail=f"Progress agent error: {type(e).__name__}: {e}")
 
 
 @app.get("/api/replan")
@@ -400,10 +420,15 @@ def replan(user_id: str, signal_id: str, model: str = "claude"):
 
         new_plan = run_planner_agent(user_id, signal_id, model_key=model, verdict=None, verbose=False)
         return {"needs_replan": True, "progress": progress, "plan": new_plan}
-    except ValueError as e:
+    except MissingDataError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except AgentOutputError as e:
+        # The data is fine; Bedrock returned something unusable. Calling this
+        # a 404 sent people hunting for missing records that were never the
+        # problem.
+        raise HTTPException(status_code=502, detail=f"The model returned something we couldn't use: {e}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Replan error: {e}")
+        raise HTTPException(status_code=500, detail=f"Replan error: {type(e).__name__}: {e}")
 
 
 # ----------------------------------------------------------------------
@@ -463,10 +488,15 @@ def get_opportunities(user_id: str, role: str = None, model: str = "nova"):
     which ones belong where, it never writes a URL."""
     try:
         return run_opportunity_finder_agent(user_id, target_role=role, model_key=model, verbose=False)
-    except ValueError as e:
+    except MissingDataError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except AgentOutputError as e:
+        # The data is fine; Bedrock returned something unusable. Calling this
+        # a 404 sent people hunting for missing records that were never the
+        # problem.
+        raise HTTPException(status_code=502, detail=f"The model returned something we couldn't use: {e}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Opportunity finder error: {e}")
+        raise HTTPException(status_code=500, detail=f"Opportunity finder error: {type(e).__name__}: {e}")
 
 
 @app.get("/api/prep")
@@ -475,10 +505,15 @@ def get_prep(user_id: str, target_role: str = None, model: str = "claude"):
     role they've saved. Defaults to their top 'interested' role."""
     try:
         return run_prep_agent(user_id, target_role, model_key=model, verbose=False)
-    except ValueError as e:
+    except MissingDataError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except AgentOutputError as e:
+        # The data is fine; Bedrock returned something unusable. Calling this
+        # a 404 sent people hunting for missing records that were never the
+        # problem.
+        raise HTTPException(status_code=502, detail=f"The model returned something we couldn't use: {e}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Prep coach error: {e}")
+        raise HTTPException(status_code=500, detail=f"Prep coach error: {type(e).__name__}: {e}")
 
 
 @app.get("/api/watch-list")

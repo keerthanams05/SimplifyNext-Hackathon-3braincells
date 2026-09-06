@@ -36,6 +36,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 from config import AWS_REGION, BEDROCK_REGION, CLAUDE_MODEL_ID, NOVA_MICRO_MODEL_ID, table_name
 from aws_clients import dynamodb, bedrock  # thread-safe shared handles
+from agent_errors import AgentOutputError, MissingDataError  # noqa: E402
 
 SYSTEM_PROMPT = f"""You are the Signal Agent in a career-disruption-monitoring system.
 
@@ -85,7 +86,7 @@ def get_signal(signal_id: str) -> dict:
     response = table.get_item(Key={"signal_id": signal_id})
     item = response.get("Item")
     if not item:
-        raise ValueError(f"No signal found with signal_id={signal_id}")
+        raise MissingDataError(f"No signal found with signal_id={signal_id}")
     return decimal_to_native(item)
 
 
@@ -127,7 +128,7 @@ def parse_agent_json(raw_text: str) -> dict:
     try:
         return json.loads(text)
     except json.JSONDecodeError as e:
-        raise ValueError(f"Model did not return valid JSON.\nRaw output:\n{raw_text}") from e
+        raise AgentOutputError(f"Model did not return valid JSON.\nRaw output:\n{raw_text}") from e
 
 
 def enrich_result(result: dict, signal: dict) -> dict:

@@ -50,6 +50,7 @@ from boto3.dynamodb.conditions import Key
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 from config import AWS_REGION, BEDROCK_REGION, CLAUDE_MODEL_ID, NOVA_MICRO_MODEL_ID, table_name
 from aws_clients import dynamodb, bedrock  # thread-safe shared handles
+from agent_errors import AgentOutputError, MissingDataError  # noqa: E402
 
 
 # The buckets the UI renders as sections. Plain language on purpose —
@@ -192,7 +193,7 @@ def parse_agent_json(raw_text: str) -> dict:
     try:
         return json.loads(text)
     except json.JSONDecodeError as e:
-        raise ValueError(f"Model did not return valid JSON.\nRaw output:\n{raw_text}") from e
+        raise AgentOutputError(f"Model did not return valid JSON.\nRaw output:\n{raw_text}") from e
 
 
 def group_for(category: str) -> str:
@@ -276,7 +277,7 @@ def run_opportunity_finder_agent(
 
     persona = get_item("users", {"user_id": user_id})
     if not persona:
-        raise ValueError(f"No persona found: {user_id}")
+        raise MissingDataError(f"No persona found: {user_id}")
 
     saved_roles = query_by_user("saved_roles", user_id)
     if target_role:
@@ -290,7 +291,10 @@ def run_opportunity_finder_agent(
     opportunities = scan_all("opportunities")
     resources = scan_all("resources")
     if not opportunities:
-        raise ValueError("No opportunities found — check load_data.py ran for opportunities.csv")
+        raise MissingDataError(
+            "The opportunities table is empty. Run: python scripts/load_data.py "
+            "(and check it finished — an earlier crash can leave later tables unloaded)."
+        )
 
     system_prompt = build_system_prompt(
         [r["target_role"] for r in saved_roles],

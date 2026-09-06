@@ -49,6 +49,7 @@ from boto3.dynamodb.conditions import Key
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 from config import AWS_REGION, BEDROCK_REGION, CLAUDE_MODEL_ID, NOVA_MICRO_MODEL_ID, table_name
 from aws_clients import dynamodb, bedrock  # thread-safe shared handles
+from agent_errors import AgentOutputError, MissingDataError  # noqa: E402
 
 
 def decimal_to_native(obj):
@@ -142,7 +143,7 @@ def parse_agent_json(raw_text: str) -> dict:
     try:
         return json.loads(text)
     except json.JSONDecodeError as e:
-        raise ValueError(f"Model did not return valid JSON.\nRaw output:\n{raw_text}") from e
+        raise AgentOutputError(f"Model did not return valid JSON.\nRaw output:\n{raw_text}") from e
 
 
 def validate_roles(result: dict, valid_roles: set):
@@ -196,7 +197,7 @@ def run_pathfinder_agent(user_id: str, signal_id: str, model_key: str = "claude"
 
     signal = get_item("signals", {"signal_id": signal_id})
     if not signal:
-        raise ValueError(f"No signal found: {signal_id}")
+        raise MissingDataError(f"No signal found: {signal_id}")
 
     options = query_by_user("pathfinder_results", user_id)
     if not options:

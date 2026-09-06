@@ -52,6 +52,7 @@ from boto3.dynamodb.conditions import Key
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 from config import AWS_REGION, BEDROCK_REGION, CLAUDE_MODEL_ID, NOVA_MICRO_MODEL_ID, table_name
 from aws_clients import dynamodb, bedrock  # thread-safe shared handles
+from agent_errors import AgentOutputError, MissingDataError  # noqa: E402
 
 
 def decimal_to_native(obj):
@@ -163,7 +164,7 @@ def parse_agent_json(raw_text: str) -> dict:
     try:
         return json.loads(text)
     except json.JSONDecodeError as e:
-        raise ValueError(f"Model did not return valid JSON.\nRaw output:\n{raw_text}") from e
+        raise AgentOutputError(f"Model did not return valid JSON.\nRaw output:\n{raw_text}") from e
 
 
 def validate_ids(result: dict, valid_task_ids: set, valid_gap_ids: set):
@@ -210,13 +211,13 @@ def run_role_intelligence_agent(user_id: str, signal_id: str, model_key: str = "
 
     signal = get_item("signals", {"signal_id": signal_id})
     if not signal:
-        raise ValueError(f"No signal found: {signal_id}")
+        raise MissingDataError(f"No signal found: {signal_id}")
 
     tasks = query_by_user("role_tasks", user_id)
     gaps = query_by_user("skill_gaps", user_id)
     skills = query_by_user("user_skills", user_id)  # not yet wired anywhere else — used here as context only
     if not tasks:
-        raise ValueError(f"No role_tasks found for user_id={user_id}")
+        raise MissingDataError(f"No role_tasks found for user_id={user_id}")
 
     valid_task_ids = [t["task_id"] for t in tasks]
     valid_gap_ids = [g["gap_id"] for g in gaps]

@@ -50,6 +50,7 @@ from boto3.dynamodb.conditions import Key
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 from config import AWS_REGION, BEDROCK_REGION, CLAUDE_MODEL_ID, NOVA_MICRO_MODEL_ID, table_name
 from aws_clients import dynamodb, bedrock  # thread-safe shared handles
+from agent_errors import AgentOutputError, MissingDataError  # noqa: E402
 
 
 def decimal_to_native(obj):
@@ -178,7 +179,7 @@ def parse_agent_json(raw_text: str) -> dict:
     try:
         return json.loads(text)
     except json.JSONDecodeError as e:
-        raise ValueError(f"Model did not return valid JSON.\nRaw output:\n{raw_text}") from e
+        raise AgentOutputError(f"Model did not return valid JSON.\nRaw output:\n{raw_text}") from e
 
 
 def validate_ids(result: dict, valid_resource_ids: set, valid_gap_ids: set):
@@ -252,7 +253,7 @@ def run_resource_connector_agent(
 
     persona = get_item("users", {"user_id": user_id})
     if not persona:
-        raise ValueError(f"No persona found: {user_id}")
+        raise MissingDataError(f"No persona found: {user_id}")
 
     # Caller (e.g. the pipeline) can pass the gaps the Role Intelligence
     # Agent just flagged, so we only match what this signal actually
@@ -267,7 +268,7 @@ def run_resource_connector_agent(
 
     resources = scan_all("resources")
     if not resources:
-        raise ValueError("No resources found — check scripts/load_data.py ran for resources.csv")
+        raise MissingDataError("The resources table is empty. Run: python scripts/load_data.py")
 
     valid_gap_ids = [g["gap_id"] for g in gaps]
     valid_resource_ids = [r["resource_id"] for r in resources]

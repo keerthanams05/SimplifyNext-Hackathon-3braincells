@@ -38,6 +38,7 @@ from config import (  # noqa: E402
     table_name,
 )
 from aws_clients import dynamodb, bedrock  # noqa: E402  thread-safe shared handles
+from agent_errors import AgentOutputError, MissingDataError  # noqa: E402
 
 try:  # Keep compatibility with older config.py files.
     from config import AGENT_MODEL_TIER  # type: ignore  # noqa: E402
@@ -220,11 +221,11 @@ def parse_agent_json(raw_text: str) -> dict:
     try:
         result = json.loads(text)
     except json.JSONDecodeError as e:
-        raise ValueError(
+        raise AgentOutputError(
             f"Model did not return valid JSON.\nRaw output:\n{raw_text}"
         ) from e
     if not isinstance(result, dict):
-        raise ValueError("Model output must be a JSON object.")
+        raise AgentOutputError("Model output must be a JSON object.")
     return result
 
 
@@ -232,20 +233,20 @@ def validate_plan_shape(result: dict):
     """Reject malformed plans before they can be returned or persisted."""
     phases = result.get("phases")
     if not isinstance(phases, list) or len(phases) != 3:
-        raise ValueError("Planner output must contain exactly three phases.")
+        raise AgentOutputError("Planner output must contain exactly three phases.")
 
     for expected_phase, phase in zip(EXPECTED_PHASES, phases):
         if not isinstance(phase, dict):
-            raise ValueError(f"Planner phase {expected_phase!r} must be an object.")
+            raise AgentOutputError(f"Planner phase {expected_phase!r} must be an object.")
         if phase.get("phase") != expected_phase:
-            raise ValueError(
+            raise AgentOutputError(
                 f"Planner phases must be ordered exactly as {EXPECTED_PHASES}; "
                 f"got {phase.get('phase')!r}."
             )
 
         for field in ("goal", "milestones", "tasks"):
             if not isinstance(phase.get(field), str) or not phase[field].strip():
-                raise ValueError(
+                raise AgentOutputError(
                     f"Planner phase {expected_phase!r} requires a non-empty {field!r}."
                 )
 
@@ -254,19 +255,19 @@ def validate_plan_shape(result: dict):
             isinstance(resource_id, str) and resource_id.strip()
             for resource_id in resource_ids
         ):
-            raise ValueError(
+            raise AgentOutputError(
                 f"Planner phase {expected_phase!r} requires resource_ids as a list of non-empty strings."
             )
 
         hours = phase.get("hours_per_week")
         if isinstance(hours, bool) or not isinstance(hours, int) or hours < 0:
-            raise ValueError(
+            raise AgentOutputError(
                 f"Planner phase {expected_phase!r} requires a non-negative integer hours_per_week."
             )
 
     explanation = result.get("explanation")
     if not isinstance(explanation, str) or not explanation.strip():
-        raise ValueError("Planner output requires a non-empty explanation.")
+        raise AgentOutputError("Planner output requires a non-empty explanation.")
 
 
 def validate_resource_catalogue(resources: list[dict]) -> set[str]:
@@ -291,7 +292,7 @@ def validate_resource_ids(result: dict, valid_resource_ids: set[str]):
     }
     bad = used - valid_resource_ids
     if bad:
-        raise ValueError(
+        raise AgentOutputError(
             "Planner returned resource_id values that do not exist in the "
             f"resource catalogue: {sorted(bad)}"
         )
@@ -354,9 +355,7 @@ def run_planner_agent(
     # Step 3: pull the global resource catalogue.
     resources = scan_all("resources")
     if not resources:
-        raise ValueError(
-            "No resources found — check scripts/load_data.py ran for resources.csv"
-        )
+        raise MissingDataError("The resources table is empty. Run: python scripts/load_data.py")
 
     # If the Resource Connector Agent already matched programmes to this
     # person's gaps, plan against that shortlist instead of the whole

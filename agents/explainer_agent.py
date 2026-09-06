@@ -39,6 +39,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from config import BEDROCK_REGION, CLAUDE_MODEL_ID, NOVA_MICRO_MODEL_ID
 from aws_clients import dynamodb, bedrock  # thread-safe shared handles
+from agent_errors import AgentOutputError, MissingDataError  # noqa: E402
 
 SYSTEM_PROMPT = f"""You are the Explainer Agent in a career-guidance system for
 Singapore workers. You are the only agent in this system whose output is read
@@ -96,7 +97,7 @@ def parse_agent_json(raw_text: str) -> dict:
     try:
         return json.loads(text)
     except json.JSONDecodeError as e:
-        raise ValueError(f"Model did not return valid JSON.\nRaw output:\n{raw_text}") from e
+        raise AgentOutputError(f"Model did not return valid JSON.\nRaw output:\n{raw_text}") from e
 
 
 def build_user_prompt(pipeline_result: dict) -> str:

@@ -334,7 +334,9 @@ async function api(path, opts) {
   if (!res.ok) {
     let detail = res.statusText;
     try { detail = (await res.json()).detail || detail; } catch (e) { /* keep statusText */ }
-    throw new Error(detail);
+    const err = new Error(detail);
+    err.status = res.status;   // 404 = data missing, 502 = model output, 500 = bug
+    throw err;
   }
   return res.json();
 }
@@ -357,9 +359,22 @@ function show(id, { push = true } = {}) {
 }
 const currentScreen = () => (document.querySelector(".screen.on") || {}).id || "s-login";
 
+// The advice has to match the actual failure. Telling someone to check the
+// API is running, when the API answered with a 404, wastes their time.
 function errorBlock(where, e) {
-  return `<div class="err"><b>${esc(where)} didn't load.</b><br>${esc(e.message)}
-    <div class="small" style="margin-top:6px">Is the API running? <code>uvicorn api.main:app --port 8000</code></div></div>`;
+  let hint;
+  if (e.status === 404) {
+    hint = `That table looks empty. Run <code>python scripts/load_data.py</code>, and check it got all the way through — a crash partway leaves later tables unloaded.`;
+  } else if (e.status === 502) {
+    hint = `The data is fine; the model's answer wasn't usable this time. Try again — if it keeps happening, that agent's token budget is probably too low for what we asked it for.`;
+  } else if (e.status >= 500) {
+    hint = `Something broke server-side. The API terminal window will have the traceback.`;
+  } else {
+    hint = `Couldn't reach the API. Is it running? <code>uvicorn api.main:app --port 8000</code>`;
+  }
+  return `<div class="err"><b>${esc(where)} didn't load.</b>
+    <div style="margin:5px 0">${esc(e.message)}</div>
+    <div class="small">${hint}</div></div>`;
 }
 
 // ---------- login ----------

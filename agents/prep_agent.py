@@ -48,6 +48,7 @@ from boto3.dynamodb.conditions import Key
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 from config import AWS_REGION, BEDROCK_REGION, CLAUDE_MODEL_ID, NOVA_MICRO_MODEL_ID, table_name
 from aws_clients import dynamodb, bedrock  # thread-safe shared handles
+from agent_errors import AgentOutputError, MissingDataError  # noqa: E402
 
 
 def decimal_to_native(obj):
@@ -161,7 +162,10 @@ def call_model(system_prompt: str, user_prompt: str, model_id: str) -> str:
         modelId=model_id,
         system=[{"text": system_prompt}],
         messages=[{"role": "user", "content": [{"text": user_prompt}]}],
-        inferenceConfig={"maxTokens": 1400, "temperature": 0.3},
+        # The largest output of any agent: readiness + bullets + questions +
+        # gaps + next steps. At 1400 it truncated mid-JSON, which surfaced as
+        # an unparseable-output error.
+        inferenceConfig={"maxTokens": 2600, "temperature": 0.3},
     )
     return response["output"]["message"]["content"][0]["text"]
 
@@ -171,7 +175,7 @@ def parse_agent_json(raw_text: str) -> dict:
     try:
         return json.loads(text)
     except json.JSONDecodeError as e:
-        raise ValueError(f"Model did not return valid JSON.\nRaw output:\n{raw_text}") from e
+        raise AgentOutputError(f"Model did not return valid JSON.\nRaw output:\n{raw_text}") from e
 
 
 def validate_bullets(result: dict, valid_tasks: set):
@@ -192,7 +196,7 @@ def run_prep_agent(user_id: str, target_role: str = None, model_key: str = "clau
 
     persona = get_item("users", {"user_id": user_id})
     if not persona:
-        raise ValueError(f"No persona found: {user_id}")
+        raise MissingDataError(f"No persona found: {user_id}")
 
     # Default to whatever they've said they're interested in, rather than
     # making the caller know the role name.
@@ -200,7 +204,10 @@ def run_prep_agent(user_id: str, target_role: str = None, model_key: str = "clau
         saved = query_by_user("saved_roles", user_id)
         interested = [r for r in saved if r.get("status") == "interested"]
         if not interested:
-            raise ValueError(f"No target role given and none saved as 'interested' for {user_id}")
+            raise MissingDataError(
+            f"No target role given, and {user_id} has no role saved as 'interested'. "
+            "Star one on the Roles screen first."
+        )
         target_role = interested[0]["target_role"]
 
     tasks = query_by_user("role_tasks", user_id)
