@@ -24,10 +24,12 @@ from decimal import Decimal
 import boto3
 from boto3.dynamodb.conditions import Key
 
-from config import AWS_REGION, table_name
+from config import AWS_REGION, AGENT_MODEL_TIER, table_name
 from pipeline import run_full_pipeline
 from progress_agent import run_progress_agent
 from planner_agent import run_planner_agent
+from resource_connector_agent import run_resource_connector_agent
+from explainer_agent import run_explainer_agent
 
 app = FastAPI(title="CareerGuardian API")
 
@@ -139,15 +141,94 @@ def get_alerts(user_id: str):
     return {"user_id": user_id, "occupation": occupation, "alerts": matching}
 
 
+AGENT_DIRECTORY = [
+    {
+        "key": "signal_agent",
+        "name": "Signal Checker",
+        "does": "Reads the news evidence and decides whether it's solid enough to act on.",
+        "asks": "Is this real, and how big a deal is it?",
+    },
+    {
+        "key": "role_intelligence",
+        "name": "Role Reader",
+        "does": "Maps the signal onto your actual tasks — not your job title.",
+        "asks": "Which parts of YOUR week does this touch?",
+    },
+    {
+        "key": "resource_connector",
+        "name": "Course Finder",
+        "does": "Matches each skill gap to real SkillsFuture and WSG programmes you can afford.",
+        "asks": "What can you actually sign up for?",
+    },
+    {
+        "key": "planner",
+        "name": "Plan Builder",
+        "does": "Sequences it into 30/60/90 days around the hours you have.",
+        "asks": "What do you do first, second, third?",
+    },
+    {
+        "key": "pathfinder",
+        "name": "Path Scout",
+        "does": "Scores nearby roles your current skills already transfer into.",
+        "asks": "Where else could you go from here?",
+    },
+    {
+        "key": "replanning_trigger",
+        "name": "Progress Coach",
+        "does": "Watches how you're tracking and rebuilds the plan when you fall behind.",
+        "asks": "Is this plan still working for you?",
+    },
+    {
+        "key": "explainer",
+        "name": "Translator",
+        "does": "Turns everything above into plain language, task-first and never alarmist.",
+        "asks": "What does this mean, in normal words?",
+    },
+]
+
+
+@app.get("/api/agents")
+def list_agents():
+    """The agent directory the UI uses to show WHO is working on your case.
+    Model tier comes from config.AGENT_MODEL_TIER so this never drifts
+    from what the agents actually run on."""
+    return [{**agent, "model_tier": AGENT_MODEL_TIER.get(agent["key"], "claude")} for agent in AGENT_DIRECTORY]
+
+
 @app.get("/api/pipeline")
-def get_pipeline_result(user_id: str, signal_id: str, model: str = "claude"):
-    """The main endpoint: runs all 4 agents for one persona + signal."""
+def get_pipeline_result(user_id: str, signal_id: str, model: str = "claude", explain: bool = True):
+    """The main endpoint: runs every agent for one persona + signal."""
     try:
-        return run_full_pipeline(user_id, signal_id, model_key=model)
+        return run_full_pipeline(user_id, signal_id, model_key=model, explain=explain)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Pipeline error: {e}")
+
+
+@app.get("/api/resources")
+def get_resource_matches(user_id: str, model: str = "nova"):
+    """Standalone Course Finder: match this person's gaps to programmes,
+    without running the whole pipeline. Cheap tier, so it's fine to call
+    from a browse screen."""
+    try:
+        return run_resource_connector_agent(user_id, model_key=model, verbose=False)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Resource connector error: {e}")
+
+
+@app.get("/api/explain")
+def explain(user_id: str, signal_id: str, model: str = "claude"):
+    """Plain-language version only. Runs the pipeline behind the scenes,
+    so prefer /api/pipeline?explain=true if you also need the data."""
+    try:
+        return run_explainer_agent(user_id, signal_id, model_key=model, verbose=False)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Explainer error: {e}")
 
 
 @app.get("/api/progress")

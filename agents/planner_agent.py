@@ -210,7 +210,7 @@ def save_plan(result: dict):
 
 def run_planner_agent(
     user_id: str, signal_id: str, model_key: str = "claude", save: bool = False, verdict: dict = None,
-    verbose: bool = True,
+    verbose: bool = True, shortlist_resource_ids: list[str] = None,
 ) -> dict:
     model_id = CLAUDE_MODEL_ID if model_key == "claude" else NOVA_MICRO_MODEL_ID
 
@@ -249,6 +249,16 @@ def run_planner_agent(
     resources = scan_all("resources")
     if not resources:
         raise ValueError("No resources found — check scripts/load_data.py ran for resources.csv")
+
+    # If the Resource Connector Agent already matched programmes to this
+    # person's gaps, plan against that shortlist instead of the whole
+    # catalogue — a smaller, pre-filtered prompt that already respects
+    # their budget and weekly hours. Falls back to the full catalogue if
+    # the shortlist is empty, so the Planner still works standalone.
+    if shortlist_resource_ids:
+        shortlisted = [r for r in resources if r["resource_id"] in set(shortlist_resource_ids)]
+        if shortlisted:
+            resources = shortlisted
 
     valid_resource_ids = [r["resource_id"] for r in resources]
 
