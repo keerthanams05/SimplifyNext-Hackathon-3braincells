@@ -171,6 +171,39 @@
   .nav button.on { color: var(--ink); }
   .nav button.on i { background: var(--butter); border: 1.5px solid var(--butter-line); }
 
+  /* per-agent attribution on the detail screen */
+  .workings { font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+              color: var(--muted); text-align: center; padding: 6px 0 2px; }
+  .step { border-radius: 18px; background: #FFF; border: 1.5px solid var(--line); overflow: hidden; }
+  .step-head { display: flex; align-items: center; gap: 10px; padding: 11px 13px;
+               background: #FAF9F6; border-bottom: 1.5px solid var(--line); cursor: pointer; }
+  .step-agent { font-size: 13px; font-weight: 700; line-height: 1.2; }
+  .step-q { font-size: 11px; color: var(--muted); line-height: 1.3; }
+  .step-info { margin-left: auto; width: 20px; height: 20px; border-radius: 50%; flex: none;
+               border: 1.5px solid var(--line); display: grid; place-items: center;
+               font-size: 11px; color: var(--muted); }
+  .step-body { padding: 12px 13px; }
+  .handoff { text-align: center; font-size: 11px; color: var(--muted); padding: 2px 0; }
+  .handoff b { color: var(--ink-soft); }
+  .story-title { font-family: var(--display); font-size: 15px; font-weight: 600;
+                 line-height: 1.3; margin-bottom: 7px; }
+  .story-p { font-size: 13px; margin: 0 0 8px; line-height: 1.5; }
+  .muted-p { color: var(--muted); }
+  .verdict { display: flex; flex-wrap: wrap; gap: 5px; margin: 9px 0; }
+  .verdict .tag { background: #F1EFEA; }
+  .story-link { display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit;
+                border: 1.5px solid var(--sky-line); background: var(--sky);
+                border-radius: 13px; padding: 10px 12px; margin-top: 4px; }
+  .firststep { margin-top: 10px; padding-top: 9px; font-size: 13px; color: var(--butter-ink);
+               border-top: 1px dashed rgba(44,49,64,0.22); }
+
+  /* agent explainer sheet */
+  .sheet { position: fixed; inset: 0; background: rgba(44,49,64,0.35); display: flex;
+           align-items: flex-end; justify-content: center; z-index: 20; }
+  .sheet-inner { background: #FCFBF9; border-radius: 22px 22px 0 0; padding: 20px 20px 26px;
+                 width: 100%; max-width: 460px; }
+  .sheet-close { margin-top: 14px; }
+
   .screen { display: none; }
   .screen.on { display: flex; flex-direction: column; gap: 13px; }
 
@@ -260,6 +293,13 @@
       <p class="small">Each one hands to the next. Tap any of them to see what it's for.</p>
       <div class="stack" id="teamList"><div class="skeleton"></div></div>
     </section>
+  </div>
+
+  <div class="sheet" id="sheet" hidden>
+    <div class="sheet-inner">
+      <div id="sheetBody"></div>
+      <button class="cta ghost sheet-close" id="sheetClose">Close</button>
+    </div>
   </div>
 
   <div class="nav" id="nav" hidden>
@@ -499,81 +539,126 @@ async function openSignal(signalId) {
   }
 }
 
+// Each agent's output gets its own labelled card, so it's always obvious
+// which one produced what — even though they run as one chain behind the
+// scenes. `step()` is that wrapper; `link()` is the connector between them.
+function step(badgeClass, letter, agentName, question, inner, handsTo) {
+  return `
+    <div class="step">
+      <div class="step-head" data-agentname="${esc(agentName)}">
+        <div class="badge sm ${badgeClass}">${esc(letter)}</div>
+        <div>
+          <div class="step-agent">${esc(agentName)}</div>
+          <div class="step-q">${esc(question)}</div>
+        </div>
+        <span class="step-info">?</span>
+      </div>
+      <div class="step-body">${inner}</div>
+    </div>
+    ${handsTo ? `<div class="handoff">↓ hands to <b>${esc(handsTo)}</b></div>` : ""}`;
+}
+
 function renderDetail(d) {
   const sig = d.signal || {}, role = d.role_intelligence || {},
         plan = d.plan || {}, path = d.pathfinder || {},
-        exp = d.explanation || {}, res = d.resources || {};
+        exp = d.explanation || {}, res = d.resources || {},
+        story = sig.story || {};
   let html = "";
 
+  // The answer first, in plain words — then the working, below.
   if (exp.headline) {
     html += `<div class="block butter">
-      <div class="b-title" style="font-size:18px;line-height:1.25;margin-bottom:7px">${esc(exp.headline)}</div>
-      <div style="font-size:13.5px;color:var(--butter-ink)">${esc(exp.summary || "")}</div>
-      ${(exp.what_changed || []).length ? `<div style="margin-top:10px">${
-        exp.what_changed.map(w => `<div class="line-item"><span class="dot" style="background:var(--butter-line)"></span><span>${esc(w)}</span></div>`).join("")
-      }</div>` : ""}
+      <div class="row" style="gap:8px;margin-bottom:8px">
+        <div class="badge sm b7">T</div>
+        <span class="step-agent">Translator · in plain words</span>
+      </div>
+      <div class="b-title" style="font-size:19px;line-height:1.25;margin-bottom:8px">${esc(exp.headline)}</div>
+      <div style="font-size:14px;color:var(--butter-ink)">${esc(exp.summary || "")}</div>
+      ${exp.first_step ? `<div class="firststep"><b>Start here:</b> ${esc(exp.first_step)}</div>` : ""}
     </div>`;
-    if (exp.first_step) {
-      html += `<div class="block mint"><div class="b-title" style="margin-bottom:4px">Start here</div>
-        <div style="font-size:13.5px;color:var(--mint-ink)">${esc(exp.first_step)}</div></div>`;
-    }
   }
 
-  html += `<div class="block plain">
-    <div class="row between" style="margin-bottom:6px">
-      <span class="b-title">${esc(sig.title || d.signal_id)}</span>
-      <span class="tag">${esc(sig.severity || "")}</span></div>
-    <div class="small">${esc(sig.reason || "")}</div></div>`;
+  html += `<div class="workings">How your team worked that out</div>`;
 
+  // 1. Signal Checker — the story itself, plus where to read it.
+  let signalInner = "";
+  if (sig.title) signalInner += `<div class="story-title">${esc(sig.title)}</div>`;
+  if (story.summary) signalInner += `<p class="story-p">${esc(story.summary)}</p>`;
+  if (story.evidence) signalInner += `<p class="story-p muted-p"><b>The evidence:</b> ${esc(story.evidence)}</p>`;
+  signalInner += `<div class="verdict">
+      <span class="tag">${esc(sig.validated === false ? "Not solid" : "Evidence holds up")}</span>
+      ${sig.severity ? `<span class="tag">${esc(sig.severity)} impact</span>` : ""}
+      ${sig.relevance_score != null ? `<span class="tag">${esc(sig.relevance_score)}/100 relevant</span>` : ""}
+    </div>`;
+  if (sig.reason) signalInner += `<p class="story-p muted-p">${esc(sig.reason)}</p>`;
+  if (story.source_url) {
+    signalInner += `<a class="story-link" href="${esc(story.source_url)}" target="_blank" rel="noopener noreferrer">
+        <div><div class="nm3">Read the original story</div>
+        <div class="meta">${esc(story.source || "source")}${story.date ? " · " + esc(story.date) : ""}</div></div>
+        <span class="arrow">↗</span></a>`;
+  }
+  html += step("b2", "S", "Signal Checker", "Is this real, and how big a deal?", signalInner, "Role Reader");
+
+  // 2. Role Reader
   const tasks = role.affected_tasks || [];
-  html += `<div class="block plain"><div class="b-title" style="margin-bottom:7px">Your tasks it touches</div>`;
-  html += tasks.length
-    ? tasks.map(t => `<div class="line-item"><span class="dot" style="background:var(--peri-line)"></span>
-        <span>${esc(typeof t === "string" ? t : (t.task || t.task_id))}</span></div>`).join("")
-      + `<div class="small" style="margin-top:8px">${esc(role.explanation || "")}</div>`
-    : `<div class="small">None of your tasks are affected by this one.</div>`;
-  html += `</div>`;
+  let roleInner = "";
+  if (tasks.length) {
+    roleInner += tasks.map(t => `<div class="line-item"><span class="dot" style="background:var(--peri-line)"></span>
+      <span>${esc(typeof t === "string" ? t : (t.task || t.task_id))}</span></div>`).join("");
+    if (role.explanation) roleInner += `<p class="story-p muted-p">${esc(role.explanation)}</p>`;
+  } else {
+    roleInner = `<p class="story-p">None of your tasks are affected by this one, so nothing below was generated.</p>`;
+  }
+  html += step("b3", "R", "Role Reader", "Which parts of your week does this touch?", roleInner,
+               tasks.length ? "Course Finder" : null);
 
-  if ((res.matches || []).length) {
-    html += `<div class="block plain"><div class="b-title" style="margin-bottom:7px">Courses that fit your budget</div>
-      ${res.matches.flatMap(m => (m.resources || []).map(r => `
-        <div class="line-item"><span class="dot" style="background:var(--mint-line)"></span>
-        <span><b>${esc(r.name)}</b><br><span class="small">${esc(r.funding || "")}</span></span></div>`)).join("")}</div>`;
+  // 3. Course Finder
+  const matches = res.matches || [];
+  if (matches.length) {
+    const inner = matches.flatMap(m => (m.resources || []).map(r => `
+      <div class="line-item"><span class="dot" style="background:var(--mint-line)"></span>
+      <span><b>${esc(r.name)}</b><br><span class="small">${esc(r.funding || r.provider || "")}</span></span></div>`)).join("")
+      || `<p class="story-p">Nothing in the catalogue fits these gaps yet.</p>`;
+    html += step("b4", "C", "Course Finder", "What could you actually sign up for?", inner, "Plan Builder");
   }
 
+  // 4. Plan Builder
   if ((plan.phases || []).length) {
-    html += `<div class="stack">${plan.phases.map((p, i) => `
+    const inner = plan.phases.map((p, i) => `
       <div class="phase ${i === 0 ? "on" : ""}">
         <div class="ph">${esc(p.phase)}</div>
         <div class="gl">${esc(p.goal || "")}</div>
         <div class="small">${esc(p.tasks || "")}</div>
         <div class="small" style="margin-top:5px">${esc(p.hours_per_week ?? "—")} hrs/week</div>
-      </div>`).join("")}</div>`;
+      </div>`).join("");
+    html += step("b5", "P", "Plan Builder", "What do you do first, second, third?", inner, "Path Scout");
   } else if (plan.no_plan_reason) {
-    html += `<div class="block plain"><div class="small">${esc(plan.no_plan_reason)}</div></div>`;
+    html += step("b5", "P", "Plan Builder", "What do you do first, second, third?",
+      `<p class="story-p">${esc(plan.no_plan_reason)}</p>`, null);
   }
 
+  // 5. Path Scout
   const opts = path.pathfinder_options || [];
   if (opts.length) {
-    html += `<div class="block plain"><div class="b-title" style="margin-bottom:8px">Where else you could go</div>
-      ${opts.map(o => {
-        const saved = state.savedRoles.some(r => r.target_role === o.target_role);
-        return `<div class="row between" style="padding:7px 0">
-          <div><div style="font-size:13.5px;font-weight:700">${esc(o.target_role)}</div>
-          <div class="small">${esc(o.similarity_score)}% of your experience carries over</div></div>
-          <button class="heart ${saved ? "" : "off"}" data-save="${esc(o.target_role)}">${saved ? "♥" : "♡"}</button>
-        </div>`;
-      }).join("")}
-      <div class="small" style="margin-top:6px">Star one and we'll watch the news for it too.</div></div>`;
+    const inner = opts.map(o => {
+      const saved = state.savedRoles.some(r => r.target_role === o.target_role);
+      return `<div class="row between" style="padding:7px 0">
+        <div><div style="font-size:13.5px;font-weight:700">${esc(o.target_role)}</div>
+        <div class="small">${esc(o.similarity_score)}% of your experience carries over</div></div>
+        <button class="heart ${saved ? "" : "off"}" data-save="${esc(o.target_role)}">${saved ? "♥" : "♡"}</button>
+      </div>`;
+    }).join("") + `<p class="story-p muted-p">Star one and the Watcher tracks it for you every morning.</p>`;
+    html += step("b1", "PS", "Path Scout", "Where else could you go from here?", inner, null);
   }
 
   if (d.timings) {
-    html += `<div class="small" style="text-align:center;padding:4px 0">
-      Seven helpers, ${esc(d.timings.total_wall_clock)}s
+    html += `<div class="small" style="text-align:center;padding:6px 0">
+      ${Object.keys(d.timings).length - 2} agents · ${esc(d.timings.total_wall_clock)}s
       (${esc(d.timings.sum_of_agents)}s of work, overlapped)</div>`;
   }
 
   $("detailBody").innerHTML = html;
+
   document.querySelectorAll("[data-save]").forEach(btn =>
     btn.addEventListener("click", async () => {
       const role = btn.dataset.save;
@@ -581,7 +666,10 @@ function renderDetail(d) {
       else { await unsaveRole(role); btn.classList.add("off"); btn.textContent = "♡"; }
     }));
 
-  // Path Scout's suggestions also feed the Roles screen.
+  // Tapping an agent's header explains what that agent is for.
+  document.querySelectorAll("[data-agentname]").forEach(el =>
+    el.addEventListener("click", () => explainAgent(el.dataset.agentname)));
+
   if (opts.length) {
     $("suggestedRoles").innerHTML = opts.map(o => {
       const saved = state.savedRoles.some(r => r.target_role === o.target_role);
@@ -593,6 +681,23 @@ function renderDetail(d) {
     document.querySelectorAll("[data-save2]").forEach(btn =>
       btn.addEventListener("click", () => saveRole(btn.dataset.save2, state.profile.industry)));
   }
+}
+
+// Shown when someone taps an agent's name anywhere in the app.
+function explainAgent(name) {
+  const a = state.agents.find(x => x.name === name);
+  if (!a) return;
+  const sheet = $("sheet");
+  $("sheetBody").innerHTML = `
+    <div class="row" style="gap:10px;margin-bottom:10px">
+      <div class="badge b4">${esc(a.name[0])}</div>
+      <div><div class="b-title">${esc(a.name)}</div><div class="small">${esc(a.asks)}</div></div>
+    </div>
+    <p style="font-size:13.5px;margin:0 0 10px">${esc(a.in_full)}</p>
+    <div class="small"><b>Reads:</b> ${esc((a.reads || []).join(", "))}</div>
+    ${a.hands_to ? `<div class="small"><b>Then hands to:</b> ${esc(a.hands_to)}</div>` : ""}
+    <div class="small"><b>Runs:</b> ${esc(a.trigger || "")}</div>`;
+  sheet.hidden = false;
 }
 
 // ---------- opportunities ----------
@@ -689,13 +794,7 @@ async function loadAgents() {
       </div>
       <div class="chain" data-detail="${i}" hidden></div>`).join("");
     document.querySelectorAll("[data-agent]").forEach(el =>
-      el.addEventListener("click", () => {
-        const a = state.agents[el.dataset.agent];
-        const box = document.querySelector(`[data-detail="${el.dataset.agent}"]`);
-        box.hidden = !box.hidden;
-        box.innerHTML = `${esc(a.in_full)}<br><b>Reads:</b> ${esc((a.reads || []).join(", "))}
-          ${a.hands_to ? `<br><b>Hands to:</b> ${esc(a.hands_to)}` : ""}`;
-      }));
+      el.addEventListener("click", () => explainAgent(state.agents[el.dataset.agent].name)));
   } catch (e) {
     $("teamList").innerHTML = errorBlock("The team", e);
   }
@@ -712,6 +811,9 @@ document.querySelectorAll("#nav button").forEach(b =>
     if (id === "s-prep") loadPrep();
     if (id === "s-roles") loadRoles();
   }));
+
+$("sheetClose").addEventListener("click", () => { $("sheet").hidden = true; });
+$("sheet").addEventListener("click", (e) => { if (e.target.id === "sheet") $("sheet").hidden = true; });
 
 $("backBtn").addEventListener("click", () => show(state.history.pop() || "s-home", { push: false }));
 

@@ -135,11 +135,24 @@ def enrich_result(result: dict, signal: dict) -> dict:
     Attach readable context the model wasn't asked to produce itself, pulled
     from our own trusted signal record — so a frontend can show this result
     directly without a separate lookup.
+
+    `story` carries what a person needs to judge this for themselves: what
+    happened, the evidence behind it, and where to go and read the original.
+    Asking someone to trust an agent's verdict without showing them the
+    source is exactly the kind of thing this product shouldn't do.
     """
     result["signal_id"] = signal["signal_id"]
     result["title"] = signal.get("title")
     result["sector"] = signal.get("sector")
     result["technology"] = signal.get("technology")
+    result["story"] = {
+        "summary": signal.get("signal_summary"),
+        "evidence": signal.get("evidence"),
+        "source": signal.get("source"),
+        "source_url": signal.get("source_url"),
+        "date": signal.get("date"),
+        "source_credibility": signal.get("source_credibility"),
+    }
     return result
 
 
