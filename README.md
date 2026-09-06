@@ -1,5 +1,4 @@
 # SimplifyNext-Hackathon-3braincells
-# SimplifyNext-Hackathon-3braincells
 
 An agentic AI pipeline that monitors career-disruption signals (e.g. AI/automation
 adoption trends), works out which parts of a specific person's role are actually
