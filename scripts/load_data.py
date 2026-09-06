@@ -1,12 +1,20 @@
 """
-Downloads the CSVs from S3, parses them, and loads them into the
-DynamoDB tables defined in config.py.
+Loads the CSVs into the DynamoDB tables defined in config.py.
 
-Assumes create_tables.py has already been run.
+Assumes create_table.py has already been run.
+
+SOURCE OF TRUTH IS THE REPO, NOT THE BUCKET. The CSVs in data/ are
+version-controlled and reviewed; the S3 copy is a snapshot somebody
+uploaded at some point. This script used to download from S3 first, which
+silently overwrote the repo's data/ files with older bucket copies and
+then loaded those — so edits committed to git never reached DynamoDB and
+the working tree came back modified. Local is now the default.
 
 Usage:
-    python scripts/load_data.py
-    python scripts/load_data.py --only personas.csv   # load just one file, useful while debugging
+    python scripts/load_data.py                       # load from the repo's data/
+    python scripts/load_data.py --from-s3             # pull from the bucket first (old behaviour)
+    python scripts/load_data.py --push-to-s3          # load locally, then refresh the bucket
+    python scripts/load_data.py --only personas.csv   # just one file, useful while debugging
 """
 
 import argparse
@@ -29,13 +37,22 @@ s3 = boto3.client("s3", region_name=AWS_REGION)
 dynamodb = boto3.resource("dynamodb", region_name=AWS_REGION)
 
 
-def download_from_s3(csv_filename: str) -> Path:
-    """Downloads one CSV from S3 into the local data/ folder and returns its
-    path. Falls back to the copy already in data/ if S3 doesn't have it —
-    otherwise adding a new CSV to the repo means nobody can load it until
-    someone remembers to re-upload the bucket."""
+def resolve_csv(csv_filename: str, from_s3: bool) -> Path:
+    """Return the path to load. Defaults to the repo copy; only reaches for
+    S3 when explicitly asked, and even then won't clobber a local file that
+    the bucket doesn't have."""
     LOCAL_DATA_DIR.mkdir(exist_ok=True)
     local_path = LOCAL_DATA_DIR / csv_filename
+
+    if not from_s3:
+        if not local_path.exists():
+            raise FileNotFoundError(
+                f"{local_path} is missing. Either restore it (git checkout data/) "
+                f"or run with --from-s3 to pull it from the bucket."
+            )
+        print(f"  reading {local_path.relative_to(PROJECT_ROOT)}")
+        return local_path
+
     key = f"{S3_RAW_PREFIX}{csv_filename}"
     try:
         print(f"  downloading s3://{S3_BUCKET_NAME}/{key} -> {local_path}")
@@ -43,8 +60,15 @@ def download_from_s3(csv_filename: str) -> Path:
     except ClientError as e:
         if e.response["Error"]["Code"] not in ("404", "NoSuchKey") or not local_path.exists():
             raise
-        print(f"  not in S3 yet — using the local copy at {local_path}")
+        print(f"  not in S3 — using the local copy at {local_path.relative_to(PROJECT_ROOT)}")
     return local_path
+
+
+def upload_to_s3(csv_filename: str):
+    """Refresh the bucket from the repo, so the S3 snapshot stops drifting."""
+    key = f"{S3_RAW_PREFIX}{csv_filename}"
+    s3.upload_file(str(LOCAL_DATA_DIR / csv_filename), S3_BUCKET_NAME, key)
+    print(f"  uploaded -> s3://{S3_BUCKET_NAME}/{key}")
 
 
 def to_dynamo_safe(value):
@@ -79,8 +103,9 @@ def parse_row(row: dict, json_columns: list[str]) -> dict:
     return to_dynamo_safe(clean)
 
 
-def load_csv_into_table(csv_filename: str, table_short_name: str, json_columns: list[str]):
-    local_path = download_from_s3(csv_filename)
+def load_csv_into_table(csv_filename: str, table_short_name: str, json_columns: list[str],
+                        from_s3: bool = False, push_to_s3: bool = False):
+    local_path = resolve_csv(csv_filename, from_s3)
     df = pd.read_csv(local_path)
 
     full_table_name = table_name(table_short_name)
@@ -92,18 +117,23 @@ def load_csv_into_table(csv_filename: str, table_short_name: str, json_columns: 
             item = parse_row(row.to_dict(), json_columns)
             batch.put_item(Item=item)
 
+    if push_to_s3:
+        upload_to_s3(csv_filename)
+
     return len(df)
 
 
-def main(only: str | None = None):
+def main(only: str | None = None, from_s3: bool = False, push_to_s3: bool = False):
     PROCESSED_DIR.mkdir(exist_ok=True)
     summary = {}
 
+    print(f"Source: {'S3 bucket' if from_s3 else 'the repo (data/)'}")
     for csv_filename, spec in CSV_TO_TABLE.items():
         if only and csv_filename != only:
             continue
         print(f"\n{csv_filename} -> {spec['table']}")
-        count = load_csv_into_table(csv_filename, spec["table"], spec["json_columns"])
+        count = load_csv_into_table(csv_filename, spec["table"], spec["json_columns"],
+                                    from_s3=from_s3, push_to_s3=push_to_s3)
         summary[csv_filename] = count
 
     manifest_path = PROCESSED_DIR / "load_summary.json"
@@ -114,5 +144,9 @@ def main(only: str | None = None):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--only", help="Load just one CSV filename, e.g. personas.csv")
+    parser.add_argument("--from-s3", action="store_true",
+                        help="pull the CSVs from the bucket first (overwrites your local data/)")
+    parser.add_argument("--push-to-s3", action="store_true",
+                        help="after loading, refresh the bucket from the repo")
     args = parser.parse_args()
-    main(only=args.only)
+    main(only=args.only, from_s3=args.from_s3, push_to_s3=args.push_to_s3)

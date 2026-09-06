@@ -552,6 +552,19 @@ scripts/config.py
 
 # Data Loading
 
+**The repo is the source of truth, not the S3 bucket.** `data/*.csv` is
+version-controlled and reviewed; the bucket is a snapshot someone uploaded at
+some point. `load_data.py` reads the repo by default:
+
+```bash
+python scripts/load_data.py                  # from data/ (default)
+python scripts/load_data.py --from-s3        # pull from the bucket first
+python scripts/load_data.py --push-to-s3     # load, then refresh the bucket from the repo
+```
+
+Use `--push-to-s3` once to bring the bucket back in line after data changes.
+
+
 Create the DynamoDB tables:
 
 ```bash
