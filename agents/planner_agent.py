@@ -28,7 +28,6 @@ from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
-import boto3
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 from config import (  # noqa: E402
@@ -38,6 +37,7 @@ from config import (  # noqa: E402
     NOVA_MICRO_MODEL_ID,
     table_name,
 )
+from aws_clients import dynamodb, bedrock  # noqa: E402  thread-safe shared handles
 
 try:  # Keep compatibility with older config.py files.
     from config import AGENT_MODEL_TIER  # type: ignore  # noqa: E402
@@ -48,9 +48,6 @@ except ImportError:  # pragma: no cover - compatibility fallback
 # tasks/gaps here — keeps the two agents' verdicts consistent.
 from role_intelligence_agent import run_role_intelligence_agent  # noqa: E402
 
-
-dynamodb = boto3.resource("dynamodb", region_name=AWS_REGION)
-bedrock = boto3.client("bedrock-runtime", region_name=BEDROCK_REGION)
 
 EXPECTED_PHASES = ["Days 1-30", "Days 31-60", "Days 61-90"]
 MODEL_IDS = {
@@ -301,10 +298,22 @@ def validate_resource_ids(result: dict, valid_resource_ids: set[str]):
 
 
 def save_plan(result: dict):
-    """Persist a generated plan to the project's plans table."""
-    table = dynamodb.Table(table_name("plans"))
+    """Persist a generated plan to the generated_plans table.
+
+    Deliberately NOT the `plans` table: that one holds the gold-standard
+    30/60/90 plans seeded from plans_30_60_90.csv, which the demo compares
+    generated output against — mixing the two would spoil the comparison.
+    `generated_plans` is also where progress_agent.get_saved_plan() looks,
+    so writing anywhere else silently leaves the Progress Agent with no
+    plan context.
+    """
+    table = dynamodb.Table(table_name("generated_plans"))
     plan_id = f"PLAN-{result['user_id']}-{result['signal_id']}"
-    table.put_item(Item={"plan_id": plan_id, **result})
+    # DynamoDB rejects Python floats, and the model can return one anywhere
+    # in the plan (e.g. hours_per_week: 5.5), so round-trip through JSON
+    # with parse_float=Decimal — same trick as signal_agent.save_result.
+    item = json.loads(json.dumps({"plan_id": plan_id, **result}), parse_float=Decimal)
+    table.put_item(Item=item)
     print(f"  Saved plan {plan_id} to DynamoDB.")
 
 
@@ -315,6 +324,7 @@ def run_planner_agent(
     save: bool = False,
     verdict: dict | None = None,
     verbose: bool = True,
+    shortlist_resource_ids: list[str] | None = None,
 ) -> dict:
     """Run the Planner Agent for one user/signal pair."""
     model_key = resolve_model_key(model_key)
@@ -347,6 +357,20 @@ def run_planner_agent(
         raise ValueError(
             "No resources found — check scripts/load_data.py ran for resources.csv"
         )
+
+    # If the Resource Connector Agent already matched programmes to this
+    # person's gaps, plan against that shortlist instead of the whole
+    # catalogue — a smaller, pre-filtered prompt that already respects
+    # their budget and weekly hours. Falls back to the full catalogue if
+    # the shortlist is empty, so the Planner still works standalone.
+    #
+    # Narrowing happens BEFORE validation on purpose: the allow-list the
+    # model is held to then becomes the shortlist, so it can't reach past
+    # what the Resource Connector approved.
+    if shortlist_resource_ids:
+        shortlisted = [r for r in resources if r["resource_id"] in set(shortlist_resource_ids)]
+        if shortlisted:
+            resources = shortlisted
 
     valid_resource_ids = validate_resource_catalogue(resources)
 

@@ -6,3 +6,12 @@ PROG004,USER002,AI content evaluation exercise,Completed,100
 PROG005,USER002,Marketing analytics dashboard,In Progress,40
 PROG006,USER003,Automation workflow map,Completed,100
 PROG007,USER003,Finance analytics dashboard,Behind Schedule,20
+PROG008,USER004,Finance automation fundamentals,Completed,100
+PROG009,USER004,Build a spend dashboard,In Progress,35
+PROG010,USER004,Shadow the analysis team,Not Started,0
+PROG011,USER005,Python basics for testers,Completed,100
+PROG012,USER005,Automate one regression suite,In Progress,60
+PROG013,USER005,Set up CI pipeline for tests,Not Started,0
+PROG014,USER006,AI content tools workshop,Completed,100
+PROG015,USER006,Build a brand positioning doc,Behind Schedule,20
+PROG016,USER006,Analytics fundamentals,Not Started,0

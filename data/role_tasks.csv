@@ -20,3 +20,23 @@ USER003,Accounts Executive,TASK024,Manage accounts payable / receivable,AR/AP Ma
 USER003,Accounts Executive,TASK025,Prepare routine financial reports,Financial Reporting,Medium,"AI can automate collection, consolidation and narrative drafting, while humans validate outputs."
 USER003,Accounts Executive,TASK026,Support month-end close,Financial Close,Medium,Automation can reduce repetitive close activities and reconciliation work.
 USER003,Accounts Executive,TASK027,Interpret unusual transactions / exceptions,Financial Analysis / Controls,Low,Human judgement and contextual investigation remain important.
+USER004,Accounts Payable Officer,TASK031,Process and code supplier invoices,Accounts Payable,High,"Invoice capture and coding is exactly the repetitive, rules-based work AP automation targets first."
+USER004,Accounts Payable Officer,TASK032,Match invoices to purchase orders,Procure-to-Pay,High,Three-way matching is being handled by AI agents that flag only the exceptions for a human.
+USER004,Accounts Payable Officer,TASK033,Chase and resolve invoice discrepancies,Exception Handling,Medium,"Routine discrepancies get auto-resolved, leaving the harder supplier negotiations to people."
+USER004,Accounts Payable Officer,TASK034,Prepare payment runs,Payments,Medium,"Scheduling and batching is increasingly automated, though approval judgment stays human."
+USER004,Accounts Payable Officer,TASK035,Reconcile supplier statements,Reconciliation,High,Statement reconciliation is a well-defined matching problem automation handles well.
+USER004,Accounts Payable Officer,TASK036,Answer supplier queries,Vendor Management,Low,Relationship and negotiation work with suppliers remains a human strength.
+USER004,Accounts Payable Officer,TASK037,Support month-end close,Financial Reporting,Low,Close still needs judgment on accruals and unusual items.
+USER005,QA Engineer,TASK041,Write and execute manual test cases,Software Testing,High,"Coding agents now generate and run test suites, shifting the work from writing cases to reviewing coverage."
+USER005,QA Engineer,TASK042,Log and triage defects,Defect Management,Medium,"Triage is increasingly assisted, but judging severity and user impact stays human."
+USER005,QA Engineer,TASK043,Run regression cycles,Regression Testing,High,Regression is the most automatable part of QA and the first to be handed to tooling.
+USER005,QA Engineer,TASK044,Verify bug fixes,Verification,Medium,Automated verification handles the routine cases; unusual fixes still need a tester.
+USER005,QA Engineer,TASK045,Review requirements for testability,Requirements Analysis,Low,Spotting ambiguity in requirements is judgment work AI supports rather than replaces.
+USER005,QA Engineer,TASK046,Coordinate UAT with business users,Stakeholder Management,Low,"Running UAT with real users is relationship work, not automatable."
+USER006,Social Media Executive,TASK051,Write daily social posts and captions,Content Production,High,"Generative AI produces first-draft copy at volume, shifting the work to editing and brand judgment."
+USER006,Social Media Executive,TASK052,Design simple post visuals,Visual Content,High,AI image tools cover routine visual variations that used to take an afternoon.
+USER006,Social Media Executive,TASK053,Schedule and publish content,Campaign Operations,Medium,Scheduling is largely tool-driven already; timing strategy is the remaining judgment.
+USER006,Social Media Executive,TASK054,Reply to comments and DMs,Community Management,Medium,Assisted replies handle routine questions; genuine community voice stays human.
+USER006,Social Media Executive,TASK055,Compile campaign performance reports,Analytics,Medium,Report assembly automates easily; deciding what the numbers mean does not.
+USER006,Social Media Executive,TASK056,Brief and manage influencers,Partnerships,Low,Negotiation and relationship judgment with creators remains human work.
+USER006,Social Media Executive,TASK057,Shape campaign concepts,Creative Strategy,Low,Original brand positioning is where marketers differentiate as production gets cheap.

@@ -32,8 +32,11 @@ AGENT_MODEL_TIER = {
     "planner": "claude",              # synthesizes a sequenced, personalized plan
     "pathfinder": "claude",           # comparative reasoning across career paths
     "resource_connector": "nova",     # matching against a known, structured resource list
+    "opportunity_finder": "nova",     # same: picks from a curated link catalogue, never writes URLs
     "replanning_trigger": "nova",     # narrow yes/no decision against known criteria
     "explainer": "claude",            # user-facing text — quality matters for the demo
+    "prep_coach": "claude",           # rewriting someone's real experience — needs care
+    "market_watcher": "nova",         # triage of incoming headlines against a watch list
 }
 
 
@@ -63,6 +66,11 @@ TABLE_SCHEMA = {
     "progress": ("user_id", "progress_id"),
     "pathfinder_results": ("user_id", "target_role"),
     "generated_plans": ("plan_id", None),
+    # Roles the person has told us they're in or curious about. This is
+    # what the Market Watcher scans for daily and what the Opportunity
+    # Finder organises its links around.
+    "saved_roles": ("user_id", "target_role"),
+    "opportunities": ("opportunity_id", None),
 }
 
 # Maps each DynamoDB table to the CSV file that feeds it, and which
@@ -103,6 +111,14 @@ CSV_TO_TABLE = {
     },
     "pathfinder.csv": {
         "table": "pathfinder_results",
+        "json_columns": [],
+    },
+    "saved_roles.csv": {
+        "table": "saved_roles",
+        "json_columns": [],
+    },
+    "opportunities.csv": {
+        "table": "opportunities",
         "json_columns": [],
     },
 }

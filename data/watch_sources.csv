@@ -1,0 +1,6 @@
+source_id,name,feed_url,role_family,notes
+SRC001,Stack Overflow Blog,https://stackoverflow.blog/feed/,Tech,Developer tooling and AI-in-engineering coverage.
+SRC002,GitHub Changelog,https://github.blog/changelog/feed/,Tech,Ships agent/Copilot capability changes as they land.
+SRC003,Tech in Asia,https://www.techinasia.com/feed,Tech,SEA tech and hiring news. VERIFY feed URL before the demo.
+SRC004,Channel NewsAsia Business,https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml,All,SG business and workforce coverage. VERIFY feed URL before the demo.
+SRC005,The Straits Times Business,https://www.straitstimes.com/news/business/rss.xml,All,SG business desk. VERIFY feed URL before the demo.

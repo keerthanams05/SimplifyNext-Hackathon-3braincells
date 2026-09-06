@@ -1,0 +1,17 @@
+user_id,target_role,status,role_family,added_on,note
+USER001,Software Engineer,current,Tech,2026-09-01,Where Sarah is today
+USER001,AI Application Engineer,interested,Tech,2026-09-01,Top pick from her Pathfinder options
+USER001,Cloud Engineer,watching,Tech,2026-09-01,Curious but not committed
+USER002,Digital Marketing Executive,current,Marketing,2026-09-01,Where Daniel is today
+USER002,Marketing Analyst,interested,Marketing,2026-09-01,Wants the data side of marketing
+USER003,Accounts Executive,current,Finance,2026-09-01,Where Michelle is today
+USER003,Financial Analyst,interested,Finance,2026-09-01,Advisory rather than processing
+USER004,Accounts Payable Officer,current,Finance,2026-09-02,Where Priya is today
+USER004,Finance Analyst,interested,Finance,2026-09-02,79% fit; her stated goal
+USER004,Procurement Executive,watching,Finance,2026-09-02,Backup direction if analysis doesn't open up
+USER005,QA Engineer,current,Tech,2026-09-02,Where Marcus is today
+USER005,Test Automation Engineer,interested,Tech,2026-09-02,Natural next step from manual testing
+USER005,AI Evaluation Specialist,interested,Tech,2026-09-02,Newer field; wants to watch it closely
+USER006,Social Media Executive,current,Marketing,2026-09-02,Where Siti is today
+USER006,Brand Strategist,interested,Marketing,2026-09-02,Her stated goal
+USER006,Marketing Analytics Executive,watching,Marketing,2026-09-02,Would need real data skills first

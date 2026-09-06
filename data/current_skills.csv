@@ -29,3 +29,27 @@ USER003,Accounts Executive,Accounting Software,Advanced
 USER003,Accounts Executive,Attention to Detail,Advanced
 USER003,Accounts Executive,Problem Solving,Advanced
 USER003,Accounts Executive,Stakeholder Management,Intermediate
+USER004,Accounts Payable Officer,Invoice Processing,Advanced
+USER004,Accounts Payable Officer,SAP / ERP Data Entry,Advanced
+USER004,Accounts Payable Officer,Excel,Advanced
+USER004,Accounts Payable Officer,Vendor Reconciliation,Advanced
+USER004,Accounts Payable Officer,GST Basics,Intermediate
+USER004,Accounts Payable Officer,Month-End Closing,Intermediate
+USER004,Accounts Payable Officer,Stakeholder Communication,Intermediate
+USER004,Accounts Payable Officer,Data Visualisation,Beginner
+USER005,QA Engineer,Manual Testing,Advanced
+USER005,QA Engineer,Test Case Design,Advanced
+USER005,QA Engineer,Jira / Test Management,Advanced
+USER005,QA Engineer,SQL,Intermediate
+USER005,QA Engineer,API Testing (Postman),Intermediate
+USER005,QA Engineer,Selenium,Beginner
+USER005,QA Engineer,Python,Beginner
+USER005,QA Engineer,CI/CD Basics,Beginner
+USER006,Social Media Executive,Content Writing,Advanced
+USER006,Social Media Executive,Social Media Scheduling,Advanced
+USER006,Social Media Executive,Community Management,Advanced
+USER006,Social Media Executive,Canva / Basic Design,Advanced
+USER006,Social Media Executive,Campaign Reporting,Intermediate
+USER006,Social Media Executive,Paid Social Basics,Intermediate
+USER006,Social Media Executive,Influencer Coordination,Intermediate
+USER006,Social Media Executive,Google Analytics,Beginner

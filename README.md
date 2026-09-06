@@ -319,29 +319,120 @@ python agents/progress_agent.py USER001
 
 ---
 
+## 6. Resource Connector Agent
+
+**File:** `agents/resource_connector_agent.py`
+
+Matches each skill gap to 1-2 real SkillsFuture/WSG programmes, respecting the person's budget, weekly hours and preferred course type. Its `shortlist_resource_ids` is handed to the Planner, so the expensive planning call sees a short pre-filtered list instead of the whole catalogue — and the Planner's allow-list becomes that shortlist, so it cannot cite a course the Connector didn't approve.
+
+Returns an empty list for a gap rather than forcing a bad match.
+
+```bash
+python agents/resource_connector_agent.py USER004
+```
+
+---
+
+## 7. Opportunity Finder Agent
+
+**File:** `agents/opportunity_finder_agent.py`
+
+For every role a person has saved, gathers the real places to go — job boards, professional bodies, communities, events, hackathons — grouped into plain-language sections ("Where the jobs are posted", "People doing this already", "Things to turn up to").
+
+**The model never writes a URL.** Every link comes out of `opportunities.csv` or `resources.csv` by ID, and `filter_to_real_ids()` discards anything that isn't a real ID before it reaches a person. A hallucinated course link in a careers product is the worst failure this app could have.
+
+```bash
+python agents/opportunity_finder_agent.py USER004
+python agents/opportunity_finder_agent.py USER004 --role "Finance Analyst"
+```
+
+---
+
+## 8. Prep Coach Agent
+
+**File:** `agents/prep_agent.py`
+
+Turns someone's real tasks into résumé lines aimed at a target role, plus the interview questions they'd actually face and an honest readiness score.
+
+Two hard rules in the prompt: it must **never invent experience** (every bullet names the real task it rewrites, and `validate_bullets()` warns if one doesn't trace back), and it must **never coach someone to hide a gap** — it names gaps and gives honest language for what they're doing about them.
+
+```bash
+python agents/prep_agent.py USER004 "Finance Analyst"
+```
+
+---
+
+## 9. Explainer Agent
+
+**File:** `agents/explainer_agent.py`
+
+The only agent whose audience is the user rather than the code. Rewrites the whole pipeline result as plain language: headline, summary, what changed, first step.
+
+Its system prompt **bans probability-of-unemployment framing outright** and forces task-level language. Everything else in the system produces data; this is where tone is decided.
+
+```bash
+python agents/explainer_agent.py USER004 SIG016
+```
+
+---
+
+## 10. Market Watcher Agent
+
+**File:** `agents/market_watcher_agent.py`
+
+The daily scan. Builds its watch list from the roles people have saved, pulls headlines from `data/watch_sources.csv` (RSS and Atom, stdlib only), drops anything already known by URL *and* by normalised title (stories get re-syndicated under different headlines), and triages the rest on the cheap tier.
+
+Survivors are written as **unvalidated** signals (`severity: "Unrated"`, `validated: false`) for the Signal Agent to assess — the Watcher finds things, it never decides they are true. A dead feed is skipped with a warning rather than failing the run.
+
+```bash
+python agents/market_watcher_agent.py --source seeded --dry-run   # offline, no spend
+python agents/market_watcher_agent.py                             # the daily run
+```
+
+Feed URLs in `watch_sources.csv` are marked VERIFY — check them before the demo. Scheduling is not yet wired up; EventBridge `rate(1 day)` or a cron line both work.
+
+---
+
 # End-to-End Pipeline
 
 **File:** `agents/pipeline.py`
 
 The main pipeline connects the core agents:
 
+The chain is four waves, not six steps. Signal, Role Intelligence and
+Pathfinder do not depend on each other, so they run concurrently:
+
 ```text
-Signal Agent
-     ↓
-Role Intelligence Agent
-     ↓
-Planner Agent
-     ↓
-Pathfinder Agent
+wave 1   Signal Agent  ‖  Role Intelligence  ‖  Pathfinder
+              ↓
+wave 2   Resource Connector   (skipped if nothing was affected)
+              ↓
+wave 3   Planner              (gets wave 1's verdict + wave 2's shortlist)
+              ↓
+wave 4   Explainer            (optional; plain-language layer)
 ```
 
-The Role Intelligence result is passed directly to Planner to avoid unnecessary duplicate model calls.
+The Role Intelligence result is passed directly to Planner to avoid duplicate
+model calls, and the Resource Connector's shortlist narrows what the Planner
+is allowed to cite.
+
+Concurrency is only safe because every agent shares thread-local AWS handles
+from `scripts/aws_clients.py` — boto3 resources are not thread-safe, and each
+thread gets its own Session-backed instance. **New agents should import
+`dynamodb`/`bedrock` from there rather than calling `boto3.resource()` at
+module level.**
 
 Run the full pipeline:
 
 ```bash
-python agents/pipeline.py USER001 SIG001
+python agents/pipeline.py USER001 SIG001            # parallel (default)
+python agents/pipeline.py USER001 SIG001 --serial   # one at a time, to compare
+python agents/pipeline.py USER001 SIG001 --no-explain
 ```
+
+Both modes print a `WHERE THE TIME WENT` table, and `/api/pipeline` returns the
+same numbers in a `timings` block, so pipeline speed stays measured rather than
+assumed.
 
 The combined response contains:
 
@@ -351,8 +442,11 @@ The combined response contains:
   "signal_id": "SIG001",
   "signal": {},
   "role_intelligence": {},
+  "resources": {},
   "plan": {},
-  "pathfinder": {}
+  "pathfinder": {},
+  "explanation": {},
+  "timings": {}
 }
 ```
 
@@ -401,11 +495,16 @@ Different agents use different model tiers depending on the complexity of the ta
 | Role Intelligence  | Claude     | Person-specific reasoning    |
 | Planner            | Claude     | Multi-stage planning         |
 | Pathfinder         | Claude     | Comparative career reasoning |
-| Resource Connector | Nova       | Structured matching concept  |
-| Replanning Trigger | Nova       | Narrow decision concept      |
+| Resource Connector | Nova       | Structured matching          |
+| Opportunity Finder | Nova       | Picks links from a catalogue |
+| Replanning Trigger | Nova       | Narrow decision              |
+| Market Watcher     | Nova       | Headline triage              |
 | Explainer          | Claude     | User-facing synthesis        |
+| Prep Coach         | Claude     | Rewriting real experience    |
 
-The final three are currently represented in configuration but are not separate standalone agents in the repository.
+All of these are now standalone agents in `agents/`.
+
+Model tier is **not surfaced in the UI** — `/api/agents` deliberately omits it. Which model runs which agent is an implementation detail, not something a user needs to read.
 
 ---
 
@@ -439,7 +538,9 @@ data/
 | `plans`              | Plan/reference-plan data        |
 | `progress`           | Progress records                |
 | `pathfinder_results` | Candidate career paths          |
-| `generated_plans`    | Configured generated-plan table |
+| `generated_plans`    | Plans written by `planner_agent --save` |
+| `saved_roles`        | **What everything personalises around** — the role someone is in, plus roles they've starred |
+| `opportunities`      | 20 real SG job boards, communities, events and professional bodies |
 
 The schema is centralised in:
 
@@ -500,6 +601,14 @@ uvicorn api.main:app --reload --port 8000
 | `GET /api/pipeline?user_id=...&signal_id=...` | Run the full pipeline                   |
 | `GET /api/progress?user_id=...&signal_id=...` | Run Progress Agent                      |
 | `GET /api/replan?user_id=...&signal_id=...`   | Check progress and re-plan if necessary |
+| `GET /api/agents`                             | Agent directory: what each is for, what it hands to next |
+| `GET/POST/DELETE /api/saved-roles`            | List, star and un-star roles |
+| `GET /api/opportunities?user_id=...&role=...` | Job boards, communities and events per pathway |
+| `GET /api/prep?user_id=...&target_role=...`   | Résumé lines, practice questions, readiness |
+| `GET /api/resources?user_id=...`              | Course matches on their own (cheap tier) |
+| `GET /api/explain?user_id=...&signal_id=...`  | Plain-language output only |
+| `GET /api/watch-list`                         | What the daily scan is watching |
+| `POST /api/watch-run?dry_run=true`            | Kick the daily scan by hand (for demos) |
 
 The alerts endpoint intentionally performs lightweight role matching first instead of running the full Bedrock pipeline for every alert.
 
@@ -759,7 +868,14 @@ SimplifyNext-Hackathon-3braincells/
 | Planner resource validation          | ✅ Implemented      |
 | Pathfinder Agent                     | ✅ Implemented      |
 | Progress Agent                       | ✅ Implemented      |
+| Resource Connector Agent             | ✅ Implemented      |
+| Opportunity Finder Agent             | ✅ Implemented      |
+| Prep Coach Agent                     | ✅ Implemented      |
+| Explainer Agent                      | ✅ Implemented      |
+| Market Watcher Agent                 | ✅ Implemented      |
+| Saved roles                          | ✅ Implemented      |
 | Agent pipeline                       | ✅ Implemented      |
+| Pipeline parallelisation             | ✅ Implemented      |
 | FastAPI backend                      | ✅ Implemented      |
 | Browser demo                         | ✅ Implemented      |
 | Progress/replanning endpoint         | ✅ Implemented      |
@@ -767,19 +883,31 @@ SimplifyNext-Hackathon-3braincells/
 | Production authentication            | ❌ Not implemented  |
 | Resume parsing                       | ❌ Not implemented  |
 | Lambda/API Gateway deployment        | ❌ Not implemented  |
-| Planner/Progress saved-plan contract | ⚠️ Needs alignment |
+| Planner/Progress saved-plan contract | ✅ Aligned          |
+| Daily Market Watcher scheduling      | ❌ Not scheduled    |
 
 ---
 
 # Known Limitations
 
-### Planner and Progress use different saved-plan table paths
+### ~~Planner and Progress use different saved-plan table paths~~ — resolved
 
-The current Planner and Progress implementations do not yet use the same saved-plan table.
+Both now use `generated_plans`. The `plans` table is left for the gold-standard
+reference rows seeded from `plans_30_60_90.csv`, which the demo compares
+generated output against; mixing generated plans into it would spoil that
+comparison.
 
-Planner currently saves through the `plans` table path, while Progress looks for generated plans through `generated_plans`.
+### The daily scan is not scheduled
 
-This should be aligned before treating the persistent re-planning loop as production-ready.
+`market_watcher_agent.py` runs when someone runs it. Making it genuinely daily
+needs EventBridge → Lambda or a cron line. Its feed URLs are also unverified —
+several are marked VERIFY in `watch_sources.csv`.
+
+### Course Finder and Plan Builder are not yet re-pickable
+
+The frontend renders what the agents chose. Letting someone swap a course or
+change their weekly hours and re-plan needs an endpoint that accepts their
+selection.
 
 ### Local API deployment
 

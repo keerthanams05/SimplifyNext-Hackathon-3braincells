@@ -17,3 +17,18 @@ USER003,Accounts Executive,SKG023,Power BI / Data Visualisation,Medium,Build dec
 USER003,Accounts Executive,SKG024,Process Automation,Medium,Identify and redesign repeatable finance workflows
 USER003,Accounts Executive,SKG025,AI-Assisted Finance,Medium,"Use AI safely for analysis, reporting and exception handling"
 USER003,Accounts Executive,SKG026,Business Partnering,Medium,Translate finance insights into business decisions
+USER004,Accounts Payable Officer,SKG031,Finance Automation Oversight,High,Supervising and spot-checking automated AP workflows instead of keying them
+USER004,Accounts Payable Officer,SKG032,Spend & Data Analysis,High,Turning payables data into supplier and cash-flow insight
+USER004,Accounts Payable Officer,SKG033,Excel to BI Tools,Medium,Moving from spreadsheets to dashboards finance teams now expect
+USER004,Accounts Payable Officer,SKG034,Process Improvement,Medium,Redesigning an AP process rather than only executing it
+USER004,Accounts Payable Officer,SKG035,Controls & Audit Awareness,Medium,Knowing what can and cannot be automated without breaking controls
+USER005,QA Engineer,SKG041,Test Automation Engineering,High,Writing and maintaining automated suites instead of executing them by hand
+USER005,QA Engineer,SKG042,AI Output Evaluation,High,"Testing systems whose output is probabilistic, not deterministic"
+USER005,QA Engineer,SKG043,Python for Test Tooling,High,The scripting foundation every automation role assumes
+USER005,QA Engineer,SKG044,CI/CD Pipeline Integration,Medium,Getting tests running automatically on every build
+USER005,QA Engineer,SKG045,Performance & Load Testing,Medium,A specialism automation hasn't commoditised
+USER006,Social Media Executive,SKG051,AI-Assisted Content Workflow,High,Directing and editing AI output instead of writing every draft from scratch
+USER006,Social Media Executive,SKG052,Brand Strategy,High,The judgment layer that stays valuable when production is commoditised
+USER006,Social Media Executive,SKG053,Marketing Analytics,High,Reading performance data well enough to defend a strategy
+USER006,Social Media Executive,SKG054,Customer Data & Segmentation,Medium,Personalisation depends on understanding the underlying data
+USER006,Social Media Executive,SKG055,Prompt & Creative Direction,Medium,"Getting usable, on-brand output from generative tools consistently"

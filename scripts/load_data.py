@@ -17,6 +17,7 @@ from pathlib import Path
 
 import boto3
 import pandas as pd
+from botocore.exceptions import ClientError
 
 from config import AWS_REGION, S3_BUCKET_NAME, S3_RAW_PREFIX, CSV_TO_TABLE, table_name
 
@@ -29,12 +30,20 @@ dynamodb = boto3.resource("dynamodb", region_name=AWS_REGION)
 
 
 def download_from_s3(csv_filename: str) -> Path:
-    """Downloads one CSV from S3 into the local data/ folder and returns its path."""
+    """Downloads one CSV from S3 into the local data/ folder and returns its
+    path. Falls back to the copy already in data/ if S3 doesn't have it —
+    otherwise adding a new CSV to the repo means nobody can load it until
+    someone remembers to re-upload the bucket."""
     LOCAL_DATA_DIR.mkdir(exist_ok=True)
     local_path = LOCAL_DATA_DIR / csv_filename
     key = f"{S3_RAW_PREFIX}{csv_filename}"
-    print(f"  downloading s3://{S3_BUCKET_NAME}/{key} -> {local_path}")
-    s3.download_file(S3_BUCKET_NAME, key, str(local_path))
+    try:
+        print(f"  downloading s3://{S3_BUCKET_NAME}/{key} -> {local_path}")
+        s3.download_file(S3_BUCKET_NAME, key, str(local_path))
+    except ClientError as e:
+        if e.response["Error"]["Code"] not in ("404", "NoSuchKey") or not local_path.exists():
+            raise
+        print(f"  not in S3 yet — using the local copy at {local_path}")
     return local_path
 
 

@@ -32,13 +32,10 @@ from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
-import boto3
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 from config import AWS_REGION, BEDROCK_REGION, CLAUDE_MODEL_ID, NOVA_MICRO_MODEL_ID, table_name
-
-dynamodb = boto3.resource("dynamodb", region_name=AWS_REGION)
-bedrock = boto3.client("bedrock-runtime", region_name=BEDROCK_REGION)
+from aws_clients import dynamodb, bedrock  # thread-safe shared handles
 
 SYSTEM_PROMPT = f"""You are the Signal Agent in a career-disruption-monitoring system.
 
