@@ -58,7 +58,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-dynamodb = boto3.resource("dynamodb", region_name=AWS_REGION)
+from aws_clients import dynamodb  # lazy + thread-local; see scripts/aws_clients.py
+
+
+@app.on_event("startup")
+def check_credentials():
+    """Say plainly at startup whether AWS is reachable. Without this, a
+    missing SSO profile surfaced as an import-time traceback that buried the
+    one line that mattered."""
+    try:
+        who = boto3.client("sts", region_name=AWS_REGION).get_caller_identity()
+        print(f"  AWS: signed in as {who['Arn'].split('/')[-1]} (account {who['Account']})")
+    except Exception as e:
+        print("\n  !! No working AWS credentials — every endpoint will fail.")
+        print(f"     {type(e).__name__}: {e}")
+        print("     Fix: aws sso login --profile hack2026")
+        print('     PowerShell: $env:AWS_PROFILE="hack2026"\n')
 
 
 def scan_all(short_table):

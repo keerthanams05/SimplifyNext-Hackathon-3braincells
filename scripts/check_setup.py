@@ -18,7 +18,10 @@ import sys
 from pathlib import Path
 
 import boto3
-from botocore.exceptions import ClientError, NoCredentialsError
+# ProfileNotFound and NoCredentialsError are BotoCoreError, not ClientError —
+# catching only ClientError meant "you haven't logged in yet", the single most
+# likely state on a fresh laptop, came out as a raw traceback.
+from botocore.exceptions import BotoCoreError, ClientError, ProfileNotFound
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from config import AWS_REGION, BEDROCK_REGION, CSV_TO_TABLE, TABLE_SCHEMA, table_name
@@ -85,15 +88,21 @@ def check_aws():
     try:
         who = boto3.client("sts", region_name=AWS_REGION).get_caller_identity()
         print(f"{OK} signed in as {who['Arn'].split('/')[-1]} (account {who['Account']})")
-    except (NoCredentialsError, ClientError) as e:
+    except ProfileNotFound as e:
+        fail(f"{e}",
+             "the AWS CLI isn't set up yet. Install it "
+             "(https://awscli.amazonaws.com/AWSCLIV2.msi on Windows), open a NEW "
+             "terminal, then: aws configure sso")
+        return
+    except (BotoCoreError, ClientError) as e:
         fail(f"no working AWS credentials: {type(e).__name__}",
-             "aws sso login --profile hack2026  (and export AWS_PROFILE=hack2026)")
+             "aws sso login --profile hack2026   (PowerShell: $env:AWS_PROFILE=\"hack2026\")")
         return
 
     dynamodb = boto3.client("dynamodb", region_name=AWS_REGION)
     try:
         existing = set(dynamodb.list_tables()["TableNames"])
-    except ClientError as e:
+    except (BotoCoreError, ClientError) as e:
         fail(f"can't list DynamoDB tables: {e}", "check your IAM permissions and the region")
         return
 
@@ -112,7 +121,7 @@ def check_aws():
             continue
         try:
             live = resource.Table(name).scan(Select="COUNT")["Count"]
-        except ClientError as e:
+        except (BotoCoreError, ClientError) as e:
             fail(f"can't scan {name}: {e}", "check IAM permissions")
             continue
         expected = len(local_rows(filename))
@@ -128,7 +137,13 @@ def check_aws():
 def main():
     print("CareerGuardian setup check")
     check_local_data()
-    check_aws()
+    try:
+        check_aws()
+    except Exception as e:
+        # Whatever goes wrong talking to AWS, this script's job is to explain
+        # it — never to add a traceback on top of the problem.
+        fail(f"unexpected AWS error: {type(e).__name__}: {e}",
+             "check the AWS CLI is installed and you've run: aws sso login --profile hack2026")
 
     print()
     if problems:
