@@ -759,6 +759,81 @@ When a signal does not affect a person, Planner can return without generating an
 
 ---
 
+# Testing it locally
+
+## 1. Is everything wired up?
+
+```bash
+python scripts/check_setup.py
+```
+
+Runs in seconds, makes **no Bedrock calls** (so it costs nothing), and checks
+the things that have actually broken: missing tables, empty tables, stale data,
+CSVs that won't parse, cross-references that don't resolve, and whether every
+persona has signals matching their role. Every failure line tells you the exact
+command to fix it. Exit code 0 means you're ready.
+
+## 2. Test one agent at a time (cheapest)
+
+Each agent runs standalone and prints its own output — no API, no frontend:
+
+```bash
+python agents/signal_agent.py SIG016                 # is the story solid?
+python agents/role_intelligence_agent.py USER004 SIG016
+python agents/resource_connector_agent.py USER004    # Nova, very cheap
+python agents/opportunity_finder_agent.py USER004    # Nova, no Bedrock spend if no roles saved
+python agents/progress_agent.py USER004              # Nova
+python agents/prep_agent.py USER004 "Finance Analyst"
+python agents/market_watcher_agent.py --source seeded --dry-run   # offline, writes nothing
+```
+
+Add `--model nova` to any Claude-tier agent while iterating — much cheaper, and
+enough to prove the plumbing works before you spend on quality.
+
+## 3. Test the whole chain
+
+```bash
+python agents/pipeline.py USER004 SIG016
+```
+
+Prints the consolidated result plus a `WHERE THE TIME WENT` table. Add
+`--no-explain` to skip the Translator, or `--serial` to compare against the
+un-parallelised timing.
+
+## 4. Test the API without the frontend
+
+```bash
+uvicorn api.main:app --reload --port 8000
+```
+
+Then in a second terminal — these two are free (no Bedrock):
+
+```bash
+curl "http://localhost:8000/api/personas"
+curl "http://localhost:8000/api/saved-roles?user_id=USER004"
+```
+
+Interactive docs at **http://localhost:8000/docs** — every endpoint with a
+"Try it out" button, which beats hand-writing curl commands.
+
+Reading the status code tells you where a problem is:
+**404** the data isn't loaded · **502** Bedrock returned something unusable ·
+**500** a bug (traceback is in the uvicorn terminal).
+
+## 5. Test the full app
+
+```bash
+uvicorn api.main:app --reload --port 8000            # terminal 1
+python -m http.server 8080 --directory frontend      # terminal 2
+```
+
+Open **http://localhost:8080**. Serve it rather than opening `index.html` from
+disk — a `file://` page hits browser origin restrictions the served version
+doesn't.
+
+Won't work in CloudShell: it has no browser and doesn't expose ports. CloudShell
+is for `create_table.py` / `load_data.py` only.
+
 # Testing
 
 The repository currently includes a basic data-load sanity test:

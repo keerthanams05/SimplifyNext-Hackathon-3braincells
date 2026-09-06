@@ -111,6 +111,12 @@ def get_profile(user_id: str):
         "years_experience": persona.get("years_experience"),
         "education": persona.get("education"),
         "career_goal": persona.get("career_goal"),
+        # The home screen shows "N hrs/wk", and the Planner builds around
+        # these — leaving them out made every persona show a dash.
+        "weekly_learning_hours": persona.get("weekly_learning_hours"),
+        "budget": persona.get("budget"),
+        "preferred_course_type": persona.get("preferred_course_type"),
+        "timeline_months": persona.get("timeline_months"),
         "skills": [{"skill": s.get("skill"), "proficiency": s.get("proficiency")} for s in skills],
     })
 
