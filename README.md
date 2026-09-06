@@ -11,13 +11,28 @@ Built for the SimplifyNext Agentic AI Hackathon 2026, using AWS Bedrock
 ## Architecture
 
 ```
-Signal Agent ──▶ Role Intelligence ──▶ Resource Connector ──▶ Planner ──▶ Pathfinder ──▶ Explainer
-(is the        (which of THIS       (which real          (30/60/90-  (which      (say it in
- evidence       person's tasks       SkillsFuture/WSG      day plan)   adjacent    plain
- solid?)        does it hit?)        programmes fit?)                  roles?)     language)
+     ┌─ daily ─────────────────────────────────────────────────────┐
+     │  Watcher ──▶ Signal Checker ──▶ Role Reader ──▶ Course      │
+     │  (scans      (is the           (which of your    Finder     │
+     │   feeds for   evidence          tasks change?)   (what can  │
+     │   your saved  solid?)                             you join?)│
+     │   roles)                                             │      │
+     └──────────────────────────────────────────────────────┼──────┘
+                                                            ▼
+   Path Scout ──▶ Opportunity Finder ──▶ Prep Coach ◀── Plan Builder
+   (where else     (job boards, events,   (résumé +      (30/60/90
+    could you go?)  communities per path)  interview)     around your week)
+                                              │
+                                              ▼
+                                         Translator ──▶ you
+                                         (plain language)
 
-                        Progress Agent ──▶ back to Planner when someone falls behind
+   Progress Coach ──▶ back to Plan Builder when someone falls behind
 ```
+
+Everything personalises around **saved roles**: the role you're in plus any
+you've starred. Starring a role adds it to the Watcher's daily scan and gives
+the Opportunity Finder another pathway to gather links for.
 
 Each stage is a standalone CLI script under `agents/`, backed by DynamoDB tables
 (seeded from `data/*.csv` via `scripts/load_data.py`) and calling Bedrock via
@@ -25,9 +40,11 @@ Each stage is a standalone CLI script under `agents/`, backed by DynamoDB tables
 `api/main.py` exposes it (plus each agent individually) over HTTP.
 
 Model tier per agent is a deliberate cost/quality split, declared once in
-`scripts/config.py`'s `AGENT_MODEL_TIER`: Claude Sonnet for the judgment-heavy
-agents, Nova Micro for the two that are really structured matching
-(Resource Connector) and a narrow yes/no call (Progress).
+`scripts/config.py`'s `AGENT_MODEL_TIER`: the judgment-heavy agents on Claude
+Sonnet, and the ones doing structured matching or narrow triage (Course
+Finder, Opportunity Finder, Progress, Watcher) on Nova Micro. **This is not
+surfaced in the UI** — which model runs what is our implementation detail, not
+something a user needs to read.
 
 **Two guardrails baked into every agent's prompt**, learned from testing:
 1. Each system prompt states today's real date and explicitly tells the model
@@ -138,6 +155,60 @@ language outright and forces task-level framing, because that framing is the
 easiest way for this product to come across badly. Everything else in the
 system produces data; this is where tone is decided.
 
+### 8. Opportunity Finder (`agents/opportunity_finder_agent.py`)
+Takes `user_id`. For each saved role, gathers the real places to go: job
+boards, communities, professional bodies, events, hackathons — grouped into
+plain-language sections ("Where the jobs are posted", "People doing this
+already", "Things to turn up to").
+
+```bash
+python agents/opportunity_finder_agent.py USER004
+python agents/opportunity_finder_agent.py USER004 --role "Finance Analyst"
+```
+
+**The model never writes a URL.** Every link comes out of `opportunities.csv`
+or `resources.csv` by ID, and `filter_to_real_ids()` drops anything that isn't
+a real ID before it reaches a person. A hallucinated course link in a careers
+product is the worst failure this app could have, so the model only chooses
+which catalogue rows belong on which pathway.
+
+### 9. Prep Coach (`agents/prep_agent.py`)
+Takes `user_id` + a target role (defaults to their top starred role). Produces
+résumé bullets, practice questions, an honest readiness score, and what to do
+before applying.
+
+```bash
+python agents/prep_agent.py USER004 "Finance Analyst"
+python agents/prep_agent.py USER004
+```
+
+Two hard rules in the prompt: **never invent experience** (every bullet must
+name the real task it rewrites, and `validate_bullets()` warns if one doesn't
+trace back), and **never coach someone to hide a gap** — it names gaps and
+gives honest language for what they're doing about them.
+
+### 10. Market Watcher (`agents/market_watcher_agent.py`)
+The daily scan. Builds a watch list from everyone's saved roles, pulls
+headlines from `data/watch_sources.csv`, drops anything already in `signals`
+(by URL and by normalised title, since stories get re-syndicated), and triages
+the rest on the cheap tier.
+
+```bash
+python agents/market_watcher_agent.py --source seeded --dry-run  # offline, no spend
+python agents/market_watcher_agent.py --dry-run                  # real feeds, no writes
+python agents/market_watcher_agent.py                            # the daily run
+```
+
+Survivors are written as **unvalidated** signals (`severity: "Unrated"`,
+`validated: false`) for the Signal Checker to assess — the Watcher finds
+things, it never decides they're true. A dead feed is skipped with a warning
+rather than failing the run.
+
+**Running it daily:** EventBridge `rate(1 day)` → Lambda, or cron
+(`0 7 * * * python agents/market_watcher_agent.py`), or a GitHub Actions
+schedule. Feed URLs in `watch_sources.csv` are marked VERIFY — check them
+before the demo.
+
 ### Running the whole chain
 
 ```bash
@@ -160,6 +231,8 @@ table names resolved through `scripts/config.py`'s `table_name()`):
 | `pathfinder_results` | `user_id` | `data/pathfinder.csv` | Candidate adjacent roles the Pathfinder Agent ranks |
 | `progress`    | `user_id` | `data/progress.csv`      | Read by the Progress Agent |
 | `users`       | `user_id` | `data/personas.csv`      | 6 Singapore personas — see below |
+| `saved_roles` | `user_id` + `target_role` | `data/saved_roles.csv` | **What everything personalises around** — the role you're in plus the ones you've starred |
+| `opportunities` | `opportunity_id` | `data/opportunities.csv` | 20 real SG job boards, communities, events and competitions |
 | `plans_30_60_90` | `user_id` | `data/plans_30_60_90.csv` | **Reference/gold-standard plans** for demo sanity-checking — not read by the Planner Agent, which generates its own |
 
 `generated_plans` (partition key `plan_id`) is in `TABLE_SCHEMA` — re-run
@@ -221,6 +294,11 @@ uvicorn api.main:app --reload --port 8000
 | `/api/explain?user_id=&signal_id=` | Plain-language output only |
 | `/api/progress?user_id=` | Progress check + re-plan decision |
 | `/api/replan?user_id=&signal_id=` | Re-plan if they're behind |
+| `GET/POST/DELETE /api/saved-roles` | Star, list and un-star future roles |
+| `/api/opportunities?user_id=&role=` | Job boards, communities and events per pathway |
+| `/api/prep?user_id=&target_role=` | Résumé lines, practice questions, readiness |
+| `/api/watch-list` | What the daily scan is currently watching |
+| `POST /api/watch-run?dry_run=true` | Kick the daily scan by hand (for demos) |
 
 ## Known issues / open items
 
@@ -254,6 +332,10 @@ uvicorn api.main:app --reload --port 8000
 - [x] Resource Connector Agent
 - [x] Progress Agent + re-plan loop
 - [x] Explainer Agent (plain-language layer)
-- [ ] Market Watcher (live signal ingestion) — deliberately skipped for the demo,
-      since `signals.csv` ships 20 real pre-collected signals
+- [x] Opportunity Finder (job boards, communities, events per pathway)
+- [x] Prep Coach (résumé + interview prep)
+- [x] Market Watcher — daily scan over saved roles
+- [x] Saved roles (star a future role, it joins the daily scan)
 - [ ] Front end rebuilt on the pastel design direction
+- [ ] Course Finder / Plan Builder as interactive pickers rather than
+      generated text (API returns options; the UI needs to render them)
