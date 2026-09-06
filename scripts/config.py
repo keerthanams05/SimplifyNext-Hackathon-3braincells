@@ -62,6 +62,7 @@ TABLE_SCHEMA = {
     "plans": ("user_id", "plan_id"),
     "progress": ("user_id", "progress_id"),
     "pathfinder_results": ("user_id", "target_role"),
+    "generated_plans": ("plan_id", None),
 }
 
 # Maps each DynamoDB table to the CSV file that feeds it, and which

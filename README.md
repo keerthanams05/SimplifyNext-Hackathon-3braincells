@@ -15,6 +15,9 @@ Signal  ──▶  Signal Agent  ──▶  Role Intelligence Agent  ──▶  
 (raw)        (validate &          (which of THIS person's        (30/60/90-day
               score it)            tasks/gaps does it hit)        plan, grounded
                                                                    in real resources)
+
+Pathfinder Agent  (user_id + target_role -> transferable-skills verdict, standalone)
+Progress Agent    (user_id -> completion %, decides if the plan above needs regenerating)
 ```
 
 Each stage is a standalone CLI script under `agents/`, backed by DynamoDB tables
@@ -79,6 +82,36 @@ call Bedrock to invent a plan — it returns `"phases": []` with a
 model would otherwise fabricate a low-effort plan even for clearly irrelevant
 signals (e.g. a marketing-sector signal against a finance persona).
 
+### 4. Pathfinder Agent (`agents/pathfinder_agent.py`)
+Takes `user_id` + a free-text `target_role`. Pulls that person's profile and
+`user_skills`, and asks the model how well their existing skills transfer
+into the target role.
+
+```bash
+python agents/pathfinder_agent.py USER001 "AI Application Engineer"
+python agents/pathfinder_agent.py USER001 "AI Application Engineer" --model nova
+python agents/pathfinder_agent.py USER001 "AI Application Engineer" --save   # writes to pathfinder_results
+```
+
+If `data/pathfinder.csv` already has a reference row for that exact
+`user_id` + `target_role` pair, it's printed afterwards as a sanity check
+(not shown to the model beforehand, same pattern as Signal Agent).
+
+### 5. Progress Agent (`agents/progress_agent.py`)
+Takes `user_id`. Pulls their `progress` records, computes overall completion
+% directly (no need for a model to do arithmetic), and asks the model
+whether progress has stalled badly enough to warrant re-running the Planner
+Agent.
+
+```bash
+python agents/progress_agent.py USER001
+python agents/progress_agent.py USER001 --model claude
+```
+
+Defaults to Nova Micro — this is the "replanning_trigger" tier in
+`scripts/config.py`'s `AGENT_MODEL_TIER`: a narrow yes/no decision, not one
+that needs Claude-level reasoning.
+
 ## Data model
 
 DynamoDB tables (seeded via `scripts/load_data.py` from `data/*.csv`,
@@ -89,15 +122,17 @@ table names resolved through `scripts/config.py`'s `table_name()`):
 | `signals`     | `signal_id`   | `data/signals.csv`       | Raw disruption signals |
 | `role_tasks`  | `user_id`     | `data/role_tasks.csv`    | Per-person current tasks |
 | `skill_gaps`  | `user_id`     | `data/skill_gaps.csv`    | Per-person skill gaps, prioritised |
-| `resources`   | `resource_id` (assumed) | `data/resources.csv` | Global — SkillsFuture/WSG programmes. No per-user key, so the Planner Agent scans the whole table. |
-| `current_skills` | — | `data/current_skills.csv` | Not yet wired into an agent |
-| `pathfinder`  | — | `data/pathfinder.csv`    | Reference alt-career-path data — not yet wired into an agent |
-| `progress`    | — | `data/progress.csv`      | Not yet wired into an agent |
+| `resources`   | `resource_id` | `data/resources.csv` | Global — SkillsFuture/WSG programmes. No per-user key, so the Planner Agent scans the whole table. |
+| `current_skills` | `user_id` | `data/current_skills.csv` | Read by the Pathfinder Agent |
+| `pathfinder`  | `user_id` | `data/pathfinder.csv`    | Reference alt-career-path data; the Pathfinder Agent also writes its own verdicts here via `--save` |
+| `progress`    | `user_id` | `data/progress.csv`      | Read by the Progress Agent |
 | `personas`    | — | `data/personas.csv`      | Persona definitions (Sarah/USER001 = SWE, Daniel/USER002 = Marketing, Michelle/USER003 = Finance) |
 | `plans_30_60_90` | `user_id` | `data/plans_30_60_90.csv` | **Reference/gold-standard plans** for demo sanity-checking — not read by the Planner Agent, which generates its own |
 
-`generated_plans` (partition key `plan_id`, string) does **not exist yet** —
-create it in `scripts/create_table.py` before using `planner_agent.py --save`.
+`generated_plans` (partition key `plan_id`, string) is now in
+`scripts/config.py`'s `TABLE_SCHEMA` — run `python scripts/create_table.py`
+again (safe to re-run, it skips existing tables) to create it before using
+`planner_agent.py --save`.
 
 ## Setup
 
@@ -121,20 +156,19 @@ Bedrock model IDs and AWS/Bedrock regions live in `scripts/config.py`
 
 ## Known issues / open items
 
-- **`.env` handling**: make sure no real credentials are committed. Use
-  `.env.example` with variable names only; add `.env` to `.gitignore`.
-- **`--save` paths are untested** for both `signal_agent.py` and
-  `planner_agent.py` in this environment — confirm target tables exist before
-  relying on them in the demo.
-- **`resources` table partition key** — assumed to be `resource_id`; confirm
-  against `scripts/create_table.py`.
+- **`--save` paths are untested** for `signal_agent.py`, `planner_agent.py`,
+  and `pathfinder_agent.py` in this environment — confirm target tables
+  exist (run `scripts/create_table.py`) before relying on them in the demo.
 - Not every `user_id` × `signal_id` combination has been run through the full
   pipeline end-to-end yet.
+- `agents/progress_agent.py`'s stalled-task judgment has no notion of *when*
+  a task was supposed to be done (no timestamps in `progress.csv`) — it can
+  only reason from `status`/`completion_pct` text, not elapsed time.
 
 ## Roadmap
 
 - [x] Signal Agent
 - [x] Role Intelligence Agent
 - [x] Planner Agent
-- [ ] Pathfinder Agent (alternate career-path recommendations, using `data/pathfinder.csv` as reference)
-- [ ] Progress Agent (tracks plan completion against `data/progress.csv`, flags drift / re-plans)
+- [x] Pathfinder Agent (alternate career-path recommendations, using `data/pathfinder.csv` as reference)
+- [x] Progress Agent (tracks plan completion against `data/progress.csv`, flags drift / re-plans)
